@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>アポ管理ツール</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --warning: #d97706;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-500: #6b7280;
+    --gray-700: #374151;
+    --gray-900: #111827;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--gray-50); color: var(--gray-900); }
+
+  /* ── Layout ── */
+  .layout { display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 220px; min-width: 220px; background: #1e293b; color: #e2e8f0; display: flex; flex-direction: column; }
+  .sidebar-header { padding: 20px 16px 12px; border-bottom: 1px solid #334155; }
+  .sidebar-title { font-size: 15px; font-weight: 700; color: #f1f5f9; }
+  .sidebar-subtitle { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; font-size: 14px; color: #94a3b8; transition: all .15s; border-left: 3px solid transparent; }
+  .nav-item:hover { background: #334155; color: #f1f5f9; }
+  .nav-item.active { background: #1e40af; color: #fff; border-left-color: #60a5fa; }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+  /* ── Main ── */
+  .main { flex: 1; overflow-y: auto; }
+  .page { display: none; padding: 24px; }
+  .page.active { display: block; }
+
+  /* ── Components ── */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .page-title { font-size: 20px; font-weight: 700; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; transition: all .15s; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-outline { background: #fff; color: var(--gray-700); border: 1px solid var(--gray-300); }
+  .btn-outline:hover { background: var(--gray-50); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  .card { background: #fff; border-radius: 10px; border: 1px solid var(--gray-200); padding: 20px; margin-bottom: 16px; }
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-700); margin-bottom: 5px; }
+  .form-control { width: 100%; padding: 8px 12px; border: 1px solid var(--gray-300); border-radius: 6px; font-size: 14px; outline: none; transition: border .15s; }
+  .form-control:focus { border-color: var(--primary); }
+  select.form-control { background: #fff; }
+  textarea.form-control { resize: vertical; min-height: 80px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-blue { background: #dbeafe; color: #1d4ed8; }
+  .badge-green { background: #dcfce7; color: #15803d; }
+  .badge-yellow { background: #fef3c7; color: #92400e; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-gray { background: var(--gray-100); color: var(--gray-700); }
+  .badge-purple { background: #ede9fe; color: #5b21b6; }
+
+  /* ── Contact Card ── */
+  .contact-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .contact-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; padding: 16px; cursor: pointer; transition: all .15s; }
+  .contact-card:hover { border-color: var(--primary); box-shadow: 0 2px 8px rgba(37,99,235,.1); }
+  .contact-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .contact-meta { font-size: 13px; color: var(--gray-500); margin-bottom: 8px; }
+  .contact-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+
+  /* ── Filter bar ── */
+  .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .filter-bar .form-control { width: auto; min-width: 160px; }
+
+  /* ── Modal ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 12px; width: 90%; max-width: 640px; max-height: 90vh; overflow-y: auto; }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--gray-200); }
+  .modal-title { font-size: 16px; font-weight: 700; }
+  .modal-close { cursor: pointer; font-size: 20px; color: var(--gray-500); background: none; border: none; }
+  .modal-body { padding: 20px; }
+  .modal-footer { padding: 12px 20px; border-top: 1px solid var(--gray-200); display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* ── Tags input ── */
+  .tags-container { border: 1px solid var(--gray-300); border-radius: 6px; padding: 6px 8px; min-height: 40px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; cursor: text; }
+  .tags-container:focus-within { border-color: var(--primary); }
+  .tag-chip { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+  .tag-chip-remove { cursor: pointer; font-size: 14px; line-height: 1; color: #3b82f6; }
+  .tags-input { border: none; outline: none; font-size: 13px; min-width: 80px; flex: 1; padding: 2px; }
+  .tags-suggestion { position: absolute; background: #fff; border: 1px solid var(--gray-200); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.1); z-index: 100; max-height: 160px; overflow-y: auto; width: 200px; }
+  .tags-suggestion-item { padding: 8px 12px; cursor: pointer; font-size: 13px; }
+  .tags-suggestion-item:hover { background: var(--gray-50); }
+
+  /* ── Analysis ── */
+  .analysis-result { margin-top: 20px; }
+  .analysis-meta { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+  .analysis-meta h4 { font-size: 13px; font-weight: 700; color: #0369a1; margin-bottom: 8px; }
+  .chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: #fff; border: 1px solid var(--gray-300); border-radius: 20px; padding: 2px 10px; font-size: 12px; }
+
+  .rank-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; padding: 16px; margin-bottom: 12px; display: flex; gap: 14px; }
+  .rank-number { font-size: 24px; font-weight: 800; color: var(--gray-300); min-width: 36px; text-align: center; line-height: 1; padding-top: 4px; }
+  .rank-number.r1 { color: #f59e0b; }
+  .rank-number.r2 { color: #94a3b8; }
+  .rank-number.r3 { color: #b45309; }
+  .rank-info { flex: 1; }
+  .rank-name { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .rank-company { font-size: 13px; color: var(--gray-500); margin-bottom: 8px; }
+  .rank-score { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .score-bar { width: 100px; height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #16a34a, #22c55e); }
+  .score-fill.mid { background: linear-gradient(90deg, #d97706, #f59e0b); }
+  .score-fill.low { background: linear-gradient(90deg, #dc2626, #ef4444); }
+  .rank-reasons { margin-top: 8px; }
+  .rank-reason-item { font-size: 13px; color: var(--gray-700); padding: 4px 0 4px 16px; position: relative; }
+  .rank-reason-item::before { content: "✓"; position: absolute; left: 0; color: var(--success); font-weight: 700; }
+  .rank-approach { margin-top: 10px; background: #f0fdf4; border-left: 3px solid #22c55e; padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 13px; color: #15803d; }
+
+  /* ── Appointments ── */
+  .appo-table { width: 100%; border-collapse: collapse; }
+  .appo-table th { text-align: left; padding: 10px 12px; background: var(--gray-50); font-size: 13px; font-weight: 600; color: var(--gray-500); border-bottom: 1px solid var(--gray-200); }
+  .appo-table td { padding: 12px; border-bottom: 1px solid var(--gray-100); font-size: 14px; vertical-align: top; }
+  .appo-table tr:hover td { background: var(--gray-50); }
+
+  /* ── Settings ── */
+  .settings-section { margin-bottom: 28px; }
+  .settings-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--gray-200); }
+  .list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border: 1px solid var(--gray-200); border-radius: 6px; margin-bottom: 6px; background: #fff; }
+  .list-item-name { font-size: 14px; }
+
+  /* ── API Key ── */
+  .apikey-section { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 14px; margin-bottom: 20px; }
+  .apikey-section label { font-size: 13px; font-weight: 600; color: #92400e; }
+  .apikey-input-wrap { display: flex; gap: 8px; margin-top: 6px; }
+
+  /* ── Loading ── */
+  .loading { display: flex; align-items: center; gap: 10px; padding: 20px; color: var(--gray-500); }
+  .spinner { width: 20px; height: 20px; border: 3px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--gray-500); }
+  .empty-state-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state-text { font-size: 15px; }
+
+  .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; z-index: 9999; animation: fadeIn .2s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- サイドバー -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">📋 アポ管理ツール</div>
+      <div class="sidebar-subtitle">Powered by Claude AI</div>
+    </div>
+    <nav style="padding: 8px 0; flex:1;">
+      <div class="nav-item active" onclick="showPage('contacts')">
+        <span class="nav-icon">👥</span> コンタクト
+      </div>
+      <div class="nav-item" onclick="showPage('appointments')">
+        <span class="nav-icon">📅</span> アポイント
+      </div>
+      <div class="nav-item" onclick="showPage('analyze')">
+        <span class="nav-icon">🔍</span> 親和性分析
+      </div>
+      <div class="nav-item" onclick="showPage('settings')">
+        <span class="nav-icon">⚙️</span> 設定
+      </div>
+    </nav>
+  </div>
+
+  <!-- メインコンテンツ -->
+  <div class="main">
+
+    <!-- ── コンタクト一覧 ── -->
+    <div id="page-contacts" class="page active">
+      <div class="page-header">
+        <div class="page-title">👥 コンタクト</div>
+        <button class="btn btn-primary" onclick="openContactModal()">＋ 新規登録</button>
+      </div>
+      <div class="filter-bar">
+        <input class="form-control" id="search-q" placeholder="🔍 名前 / 会社名" oninput="loadContacts()" style="min-width:200px;">
+        <select class="form-control" id="filter-industry" onchange="loadContacts()">
+          <option value="">全業種</option>
+        </select>
+        <select class="form-control" id="filter-tag" onchange="loadContacts()">
+          <option value="">全タグ</option>
+        </select>
+        <span id="contact-count" style="font-size:13px;color:var(--gray-500);"></span>
+      </div>
+      <div id="contact-grid" class="contact-grid"></div>
+    </div>
+
+    <!-- ── アポイント一覧 ── -->
+    <div id="page-appointments" class="page">
+      <div class="page-header">
+        <div class="page-title">📅 アポイント</div>
+        <button class="btn btn-primary" onclick="openAppoModal()">＋ 新規追加</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <table class="appo-table">
+          <thead>
+            <tr>
+              <th>日付</th><th>タイトル</th><th>コンタクト</th><th>会社</th><th>業種</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="appo-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── 親和性分析 ── -->
+    <div id="page-analyze" class="page">
+      <div class="page-header">
+        <div class="page-title">🔍 親和性分析</div>
+      </div>
+      <div class="apikey-section">
+        <label>🔑 Anthropic API Key（このデバイスのみで使用）</label>
+        <div class="apikey-input-wrap">
+          <input type="password" class="form-control" id="api-key" placeholder="sk-ant-..." style="flex:1;">
+          <button class="btn btn-outline btn-sm" onclick="toggleApiKeyVisibility()">表示</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="form-group">
+          <label class="form-label">文字起こし（会話ログ・議事録などを貼り付け）</label>
+          <textarea class="form-control" id="transcript" rows="10" placeholder="商談・会議・通話などの文字起こしテキストをそのまま貼り付けてください..."></textarea>
+        </div>
+        <div class="form-row" style="grid-template-columns: 1fr auto;">
+          <div>
+            <label class="form-label">業種で絞り込み（任意）</label>
+            <select class="form-control" id="analyze-industry">
+              <option value="">全コンタクトを対象</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:flex-end;">
+            <button class="btn btn-primary" onclick="runAnalysis()" style="width:140px;">
+              ✨ 分析する
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="analysis-result"></div>
+    </div>
+
+    <!-- ── 設定 ── -->
+    <div id="page-settings" class="page">
+      <div class="page-header">
+        <div class="page-title">⚙️ 設定</div>
+      </div>
+
+      <!-- 業種管理 -->
+      <div class="settings-section">
+        <div class="settings-title">🏭 業種カテゴリー</div>
+        <div class="filter-bar">
+          <input class="form-control" id="new-industry" placeholder="業種名を入力" style="width:220px;">
+          <button class="btn btn-primary" onclick="addIndustry()">＋ 追加</button>
+        </div>
+        <div id="industry-list"></div>
+      </div>
+
+      <!-- タグ管理 -->
+      <div class="settings-section">
+        <div class="settings-title">🏷️ タグ管理</div>
+        <div class="filter-bar">
+          <input class="form-control" id="new-tag" placeholder="タグ名を入力" style="width:220px;">
+          <button class="btn btn-primary" onclick="addTag()">＋ 追加</button>
+        </div>
+        <div id="tag-list"></div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- ── コンタクトモーダル ── -->
+<div class="modal-overlay" id="contact-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="contact-modal-title">コンタクト登録</div>
+      <button class="modal-close" onclick="closeModal('contact-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="contact-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">氏名 *</label>
+          <input class="form-control" id="c-name" placeholder="山田 太郎">
+        </div>
+        <div class="form-group">
+          <label class="form-label">会社名</label>
+          <input class="form-control" id="c-company" placeholder="株式会社○○">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">役職</label>
+          <input class="form-control" id="c-role" placeholder="営業部長">
+        </div>
+        <div class="form-group">
+          <label class="form-label">業種</label>
+          <select class="form-control" id="c-industry"><option value="">-- 選択 --</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">メール</label>
+          <input class="form-control" id="c-email" type="email" placeholder="email@example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">電話番号</label>
+          <input class="form-control" id="c-phone" placeholder="090-0000-0000">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">タグ</label>
+        <div style="position:relative;">
+          <div class="tags-container" id="tags-container" onclick="document.getElementById('tag-input').focus()">
+            <input class="tags-input" id="tag-input" placeholder="タグを入力..." oninput="showTagSuggestions()" onkeydown="handleTagKey(event)">
+          </div>
+          <div class="tags-suggestion" id="tag-suggestions" style="display:none;"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">メモ・特記事項</label>
+        <textarea class="form-control" id="c-notes" rows="4" placeholder="課題・関心事・過去の商談内容など..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('contact-modal')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveContact()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── アポイントモーダル ── -->
+<div class="modal-overlay" id="appo-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="appo-modal-title">アポイント追加</div>
+      <button class="modal-close" onclick="closeModal('appo-modal')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="appo-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">タイトル *</label>
+          <input class="form-control" id="a-title" placeholder="初回商談 / フォローアップなど">
+        </div>
+        <div class="form-group">
+          <label class="form-label">日付</label>
+          <input class="form-control" id="a-date" type="date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">コンタクト</label>
+        <select class="form-control" id="a-contact"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">議事録サマリー</label>
+        <textarea class="form-control" id="a-summary" rows="3" placeholder="要点をまとめて入力..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">文字起こし（任意）</label>
+        <textarea class="form-control" id="a-transcript" rows="5" placeholder="会話の文字起こしを貼り付け..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('appo-modal')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveAppo()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── コンタクト詳細モーダル ── -->
+<div class="modal-overlay" id="contact-detail-modal">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-header">
+      <div class="modal-title" id="detail-name">詳細</div>
+      <button class="modal-close" onclick="closeModal('contact-detail-modal')">×</button>
+    </div>
+    <div class="modal-body" id="contact-detail-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="deleteContact()">削除</button>
+      <button class="btn btn-outline" onclick="closeModal('contact-detail-modal')">閉じる</button>
+      <button class="btn btn-primary" onclick="editCurrentContact()">編集</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+let industries = [];
+let allTags = [];
+let currentTags = [];
+let currentContactId = null;
+let contacts = [];
+
+// ─────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadIndustries();
+  await loadTags();
+  await loadContacts();
+  await loadAppointments();
+  // 今日の日付をデフォルトに
+  document.getElementById('a-date').value = new Date().toISOString().split('T')[0];
+});
+
+// ─────────────────────────────────────────────
+// Page Navigation
+// ─────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'settings') { renderIndustryList(); renderTagList(); }
+  if (name === 'appointments') loadAppointments();
+}
+
+// ─────────────────────────────────────────────
+// Industries
+// ─────────────────────────────────────────────
+async function loadIndustries() {
+  const res = await fetch('/api/industries');
+  industries = await res.json();
+  populateIndustrySelects();
+}
+
+function populateIndustrySelects() {
+  const selects = ['filter-industry', 'c-industry', 'analyze-industry'];
+  selects.forEach(id => {
+    const sel = document.getElementById(id);
+    const firstOpt = sel.options[0].outerHTML;
+    sel.innerHTML = firstOpt;
+    industries.forEach(ind => {
+      sel.innerHTML += `<option value="${ind.name}">${ind.name}</option>`;
+    });
+  });
+}
+
+async function addIndustry() {
+  const name = document.getElementById('new-industry').value.trim();
+  if (!name) return;
+  await fetch('/api/industries', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name}) });
+  document.getElementById('new-industry').value = '';
+  await loadIndustries();
+  renderIndustryList();
+  showToast('業種を追加しました');
+}
+
+async function deleteIndustry(id) {
+  if (!confirm('この業種を削除しますか？')) return;
+  await fetch('/api/industries/' + id, { method:'DELETE' });
+  await loadIndustries();
+  renderIndustryList();
+  showToast('削除しました');
+}
+
+function renderIndustryList() {
+  const el = document.getElementById('industry-list');
+  el.innerHTML = industries.map(ind => `
+    <div class="list-item">
+      <span class="list-item-name">🏭 ${ind.name}</span>
+      <button class="btn btn-outline btn-sm" onclick="deleteIndustry(${ind.id})">削除</button>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────────
+// Tags
+// ─────────────────────────────────────────────
+async function loadTags() {
+  const res = await fetch('/api/tags');
+  allTags = await res.json();
+  // フィルターセレクト更新
+  const sel = document.getElementById('filter-tag');
+  sel.innerHTML = '<option value="">全タグ</option>';
+  allTags.forEach(t => sel.innerHTML += `<option value="${t.name}">${t.name}</option>`);
+}
+
+async function addTag() {
+  const name = document.getElementById('new-tag').value.trim();
+  if (!name) return;
+  await fetch('/api/tags', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name}) });
+  document.getElementById('new-tag').value = '';
+  await loadTags();
+  renderTagList();
+  showToast('タグを追加しました');
+}
+
+async function deleteTagById(id) {
+  if (!confirm('このタグを削除しますか？')) return;
+  await fetch('/api/tags/' + id, { method:'DELETE' });
+  await loadTags();
+  renderTagList();
+  showToast('削除しました');
+}
+
+function renderTagList() {
+  const el = document.getElementById('tag-list');
+  el.innerHTML = allTags.map(t => `
+    <div class="list-item">
+      <span class="list-item-name">🏷️ ${t.name}</span>
+      <button class="btn btn-outline btn-sm" onclick="deleteTagById(${t.id})">削除</button>
+    </div>
+  `).join('');
+}
+
+// Tags Input
+function showTagSuggestions() {
+  const input = document.getElementById('tag-input').value.toLowerCase();
+  const sug = document.getElementById('tag-suggestions');
+  const filtered = allTags.filter(t => t.name.toLowerCase().includes(input) && !currentTags.includes(t.name));
+  if (!filtered.length || !input) { sug.style.display = 'none'; return; }
+  sug.style.display = 'block';
+  sug.innerHTML = filtered.map(t => `<div class="tags-suggestion-item" onclick="addCurrentTag('${t.name}')">${t.name}</div>`).join('');
+}
+
+function handleTagKey(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = document.getElementById('tag-input').value.trim();
+    if (val) addCurrentTag(val);
+  } else if (e.key === 'Backspace' && !document.getElementById('tag-input').value) {
+    removeLastTag();
+  }
+}
+
+function addCurrentTag(name) {
+  if (!name || currentTags.includes(name)) return;
+  currentTags.push(name);
+  renderCurrentTags();
+  document.getElementById('tag-input').value = '';
+  document.getElementById('tag-suggestions').style.display = 'none';
+}
+
+function removeTag(name) {
+  currentTags = currentTags.filter(t => t !== name);
+  renderCurrentTags();
+}
+
+function removeLastTag() {
+  if (currentTags.length) { currentTags.pop(); renderCurrentTags(); }
+}
+
+function renderCurrentTags() {
+  const container = document.getElementById('tags-container');
+  const input = document.getElementById('tag-input');
+  container.innerHTML = '';
+  currentTags.forEach(t => {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.innerHTML = `${t} <span class="tag-chip-remove" onclick="removeTag('${t}')">×</span>`;
+    container.appendChild(chip);
+  });
+  container.appendChild(input);
+  input.focus();
+}
+
+// ─────────────────────────────────────────────
+// Contacts
+// ─────────────────────────────────────────────
+async function loadContacts() {
+  const q = document.getElementById('search-q').value;
+  const industry = document.getElementById('filter-industry').value;
+  const tag = document.getElementById('filter-tag').value;
+  const params = new URLSearchParams({ q, industry, tag });
+  const res = await fetch('/api/contacts?' + params);
+  contacts = await res.json();
+  document.getElementById('contact-count').textContent = contacts.length + '件';
+  renderContacts();
+  // アポモーダルのコンタクト選択も更新
+  updateContactSelect();
+}
+
+function renderContacts() {
+  const grid = document.getElementById('contact-grid');
+  if (!contacts.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="empty-state-icon">👤</div><div class="empty-state-text">コンタクトがありません</div></div>`;
+    return;
+  }
+  grid.innerHTML = contacts.map(c => `
+    <div class="contact-card" onclick="showContactDetail(${c.id})">
+      <div class="contact-name">${c.name}</div>
+      <div class="contact-meta">
+        ${c.company ? `<strong>${c.company}</strong>` : ''}
+        ${c.role ? ` ・ ${c.role}` : ''}
+      </div>
+      ${c.industry ? `<span class="badge badge-blue">${c.industry}</span>` : ''}
+      ${c.appo_count ? `<span class="badge badge-green" style="margin-left:4px;">📅 ${c.appo_count}回</span>` : ''}
+      <div class="contact-tags">
+        ${(c.categories||[]).map(t => `<span class="badge badge-gray">${t}</span>`).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateContactSelect() {
+  const sel = document.getElementById('a-contact');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">-- 選択なし --</option>';
+  contacts.forEach(c => {
+    sel.innerHTML += `<option value="${c.id}" ${c.id==cur?'selected':''}>${c.name}${c.company?' ('+c.company+')':''}</option>`;
+  });
+}
+
+function openContactModal(prefill = {}) {
+  currentTags = prefill.categories || [];
+  document.getElementById('contact-id').value = prefill.id || '';
+  document.getElementById('c-name').value = prefill.name || '';
+  document.getElementById('c-company').value = prefill.company || '';
+  document.getElementById('c-role').value = prefill.role || '';
+  document.getElementById('c-email').value = prefill.email || '';
+  document.getElementById('c-phone').value = prefill.phone || '';
+  document.getElementById('c-notes').value = prefill.notes || '';
+  document.getElementById('c-industry').value = prefill.industry || '';
+  document.getElementById('contact-modal-title').textContent = prefill.id ? 'コンタクト編集' : 'コンタクト登録';
+  renderCurrentTags();
+  document.getElementById('contact-modal').classList.add('open');
+}
+
+async function saveContact() {
+  const id = document.getElementById('contact-id').value;
+  const data = {
+    name: document.getElementById('c-name').value.trim(),
+    company: document.getElementById('c-company').value.trim(),
+    role: document.getElementById('c-role').value.trim(),
+    email: document.getElementById('c-email').value.trim(),
+    phone: document.getElementById('c-phone').value.trim(),
+    industry: document.getElementById('c-industry').value,
+    categories: currentTags,
+    notes: document.getElementById('c-notes').value.trim(),
+  };
+  if (!data.name) { showToast('氏名は必須です', 'error'); return; }
+  const url = id ? '/api/contacts/' + id : '/api/contacts';
+  const method = id ? 'PUT' : 'POST';
+  await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+  closeModal('contact-modal');
+  await loadContacts();
+  showToast(id ? '更新しました' : '登録しました');
+}
+
+async function showContactDetail(id) {
+  currentContactId = id;
+  const res = await fetch('/api/contacts/' + id);
+  const c = await res.json();
+  document.getElementById('detail-name').textContent = c.name + (c.company ? ' / ' + c.company : '');
+  const body = document.getElementById('contact-detail-body');
+  body.innerHTML = `
+    <div class="form-row" style="margin-bottom:14px;">
+      <div><div class="form-label">会社名</div><div>${c.company||'—'}</div></div>
+      <div><div class="form-label">役職</div><div>${c.role||'—'}</div></div>
+    </div>
+    <div class="form-row" style="margin-bottom:14px;">
+      <div><div class="form-label">業種</div><div>${c.industry ? `<span class="badge badge-blue">${c.industry}</span>` : '—'}</div></div>
+      <div><div class="form-label">メール</div><div>${c.email||'—'}</div></div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div class="form-label">タグ</div>
+      <div>${(c.categories||[]).map(t=>`<span class="badge badge-gray" style="margin-right:4px;">${t}</span>`).join('')||'—'}</div>
+    </div>
+    <div style="margin-bottom:16px;">
+      <div class="form-label">メモ</div>
+      <div style="white-space:pre-wrap;font-size:14px;color:var(--gray-700);">${c.notes||'—'}</div>
+    </div>
+    <div>
+      <div class="form-label" style="margin-bottom:8px;">アポイント履歴（${c.appointments.length}件）</div>
+      ${c.appointments.length ? c.appointments.map(a => `
+        <div style="border:1px solid var(--gray-200);border-radius:6px;padding:10px 12px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <strong style="font-size:14px;">${a.title}</strong>
+            <span style="font-size:12px;color:var(--gray-500);">${a.date||''}</span>
+          </div>
+          ${a.summary ? `<div style="font-size:13px;color:var(--gray-700);">${a.summary}</div>` : ''}
+        </div>
+      `).join('') : '<div style="color:var(--gray-500);font-size:14px;">アポイントなし</div>'}
+    </div>
+  `;
+  document.getElementById('contact-detail-modal').classList.add('open');
+}
+
+async function deleteContact() {
+  if (!confirm('このコンタクトを削除しますか？')) return;
+  await fetch('/api/contacts/' + currentContactId, { method:'DELETE' });
+  closeModal('contact-detail-modal');
+  await loadContacts();
+  showToast('削除しました');
+}
+
+function editCurrentContact() {
+  closeModal('contact-detail-modal');
+  const c = contacts.find(x => x.id == currentContactId);
+  if (c) openContactModal(c);
+}
+
+// ─────────────────────────────────────────────
+// Appointments
+// ─────────────────────────────────────────────
+async function loadAppointments() {
+  const res = await fetch('/api/appointments');
+  const appos = await res.json();
+  const tbody = document.getElementById('appo-tbody');
+  if (!appos.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--gray-500);padding:32px;">アポイントがありません</td></tr>';
+    return;
+  }
+  tbody.innerHTML = appos.map(a => `
+    <tr>
+      <td style="white-space:nowrap;">${a.date||'—'}</td>
+      <td><strong>${a.title}</strong>${a.summary ? `<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">${a.summary.slice(0,60)}${a.summary.length>60?'…':''}</div>` : ''}</td>
+      <td>${a.contact_name||'—'}</td>
+      <td>${a.company||'—'}</td>
+      <td>${a.industry ? `<span class="badge badge-blue">${a.industry}</span>` : '—'}</td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-outline btn-sm" onclick="editAppo(${JSON.stringify(a).replace(/"/g,'&quot;')})">編集</button>
+        <button class="btn btn-danger btn-sm" style="margin-left:4px;" onclick="deleteAppo(${a.id})">削除</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openAppoModal(prefill = {}) {
+  document.getElementById('appo-id').value = prefill.id || '';
+  document.getElementById('a-title').value = prefill.title || '';
+  document.getElementById('a-date').value = prefill.date || new Date().toISOString().split('T')[0];
+  document.getElementById('a-summary').value = prefill.summary || '';
+  document.getElementById('a-transcript').value = prefill.transcript || '';
+  document.getElementById('a-contact').value = prefill.contact_id || '';
+  document.getElementById('appo-modal-title').textContent = prefill.id ? 'アポイント編集' : 'アポイント追加';
+  document.getElementById('appo-modal').classList.add('open');
+}
+
+function editAppo(a) { openAppoModal(a); }
+
+async function saveAppo() {
+  const id = document.getElementById('appo-id').value;
+  const data = {
+    contact_id: document.getElementById('a-contact').value || null,
+    title: document.getElementById('a-title').value.trim(),
+    date: document.getElementById('a-date').value,
+    summary: document.getElementById('a-summary').value.trim(),
+    transcript: document.getElementById('a-transcript').value.trim(),
+  };
+  if (!data.title) { showToast('タイトルは必須です', 'error'); return; }
+  const url = id ? '/api/appointments/' + id : '/api/appointments';
+  const method = id ? 'PUT' : 'POST';
+  await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+  closeModal('appo-modal');
+  await loadAppointments();
+  showToast(id ? '更新しました' : '追加しました');
+}
+
+async function deleteAppo(id) {
+  if (!confirm('削除しますか？')) return;
+  await fetch('/api/appointments/' + id, { method:'DELETE' });
+  await loadAppointments();
+  showToast('削除しました');
+}
+
+// ─────────────────────────────────────────────
+// Analysis
+// ─────────────────────────────────────────────
+async function runAnalysis() {
+  const transcript = document.getElementById('transcript').value.trim();
+  const api_key = document.getElementById('api-key').value.trim();
+  const industry = document.getElementById('analyze-industry').value;
+  const resultEl = document.getElementById('analysis-result');
+
+  if (!transcript) { showToast('文字起こしを入力してください', 'error'); return; }
+  if (!api_key) { showToast('API Keyを入力してください', 'error'); return; }
+
+  resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> Claude AIが分析中...</div>';
+
+  const res = await fetch('/api/analyze', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ transcript, api_key, industry })
+  });
+  const data = await res.json();
+
+  if (data.error) {
+    resultEl.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;"><strong style="color:var(--danger);">エラー：</strong>${data.error}</div>`;
+    return;
+  }
+
+  if (data.raw) {
+    resultEl.innerHTML = `<div class="card"><pre style="white-space:pre-wrap;font-size:13px;">${data.raw}</pre></div>`;
+    return;
+  }
+
+  const ta = data.transcript_analysis || {};
+  const ranked = data.ranked_contacts || [];
+
+  let html = '<div class="analysis-result">';
+
+  // 文字起こし分析結果
+  html += `<div class="analysis-meta">
+    <h4>📊 文字起こし分析</h4>
+    <div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">主要テーマ：</strong>
+      <div class="chip-list" style="margin-top:4px;">${(ta.main_topics||[]).map(t=>`<span class="chip">${t}</span>`).join('')}</div>
+    </div>
+    <div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">課題・ニーズ：</strong>
+      <div class="chip-list" style="margin-top:4px;">${(ta.needs_and_concerns||[]).map(t=>`<span class="chip">⚠️ ${t}</span>`).join('')}</div>
+    </div>
+    ${ta.industry_context ? `<div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">業界コンテキスト：</strong> ${ta.industry_context}</div>` : ''}
+    <div><strong style="font-size:12px;color:#0369a1;">キーワード：</strong>
+      <div class="chip-list" style="margin-top:4px;">${(ta.keywords||[]).map(k=>`<span class="chip">${k}</span>`).join('')}</div>
+    </div>
+  </div>`;
+
+  // ランキング
+  if (!ranked.length) {
+    html += '<div class="card"><div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-text">親和性スコア50以上のコンタクトが見つかりませんでした</div></div></div>';
+  } else {
+    html += `<div style="font-size:14px;font-weight:700;margin-bottom:12px;">🏆 親和性ランキング（${ranked.length}件）</div>`;
+    ranked.forEach(r => {
+      const score = r.affinity_score || 0;
+      const colorClass = score >= 75 ? '' : score >= 55 ? 'mid' : 'low';
+      const rankClass = r.rank <= 3 ? 'r' + r.rank : '';
+      html += `
+        <div class="rank-card">
+          <div class="rank-number ${rankClass}">${r.rank}</div>
+          <div class="rank-info">
+            <div class="rank-name">${r.name}</div>
+            <div class="rank-company">${r.company||''}</div>
+            <div class="rank-score">
+              <span class="badge ${score>=75?'badge-green':score>=55?'badge-yellow':'badge-red'}">
+                ${r.affinity_level} ${score}点
+              </span>
+              <div class="score-bar">
+                <div class="score-fill ${colorClass}" style="width:${score}%"></div>
+              </div>
+            </div>
+            <div class="rank-reasons">
+              ${(r.reasons||[]).map(reason => `<div class="rank-reason-item">${reason}</div>`).join('')}
+            </div>
+            ${r.suggested_approach ? `<div class="rank-approach">💡 ${r.suggested_approach}</div>` : ''}
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  html += '</div>';
+  resultEl.innerHTML = html;
+}
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('api-key');
+  input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+// ─────────────────────────────────────────────
+// Utils
+// ─────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function showToast(msg, type = 'success') {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.style.background = type === 'error' ? '#dc2626' : '#1e293b';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2500);
+}
+
+// 外側クリックでモーダルを閉じる
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// タグサジェスト：外側クリックで閉じる
+document.addEventListener('click', e => {
+  if (!e.target.closest('#tags-container') && !e.target.closest('#tag-suggestions')) {
+    document.getElementById('tag-suggestions').style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>
