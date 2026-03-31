@@ -155,6 +155,46 @@
 
   .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 14px; z-index: 9999; animation: fadeIn .2s; }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── Report Tabs ── */
+  .report-tab { padding: 8px 18px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--gray-500); border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all .15s; }
+  .report-tab:hover { color: var(--primary); }
+  .report-tab.active-tab { color: var(--primary); border-bottom-color: var(--primary); }
+
+  /* ── KPI Cards ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; padding: 16px; text-align: center; }
+  .kpi-value { font-size: 32px; font-weight: 800; color: var(--primary); line-height: 1; margin-bottom: 4px; }
+  .kpi-value.null-val { color: var(--gray-300); font-size: 24px; }
+  .kpi-label { font-size: 12px; color: var(--gray-500); font-weight: 600; }
+
+  /* ── Section Cards ── */
+  .section-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  .section-card-header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: var(--gray-50); border-bottom: 1px solid var(--gray-200); font-size: 14px; font-weight: 700; }
+  .section-card-body { padding: 14px 16px; }
+
+  .item-row { padding: 10px 12px; border: 1px solid var(--gray-200); border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+  .item-row:last-child { margin-bottom: 0; }
+  .item-row.green { border-left: 4px solid #16a34a; background: #f0fdf4; }
+  .item-row.red { border-left: 4px solid #dc2626; background: #fff5f5; }
+  .item-row.orange { border-left: 4px solid #d97706; background: #fffbeb; }
+  .item-row.purple { border-left: 4px solid #7c3aed; background: #f5f3ff; }
+  .item-row.blue { border-left: 4px solid #2563eb; background: #eff6ff; }
+  .item-label { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; margin-bottom: 3px; }
+  .item-text { color: var(--gray-900); line-height: 1.5; }
+  .item-sub { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+
+  .priority-rank { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; background: var(--primary); color: #fff; border-radius: 50%; font-size: 12px; font-weight: 800; margin-right: 8px; flex-shrink: 0; }
+  .priority-rank.r1 { background: #dc2626; }
+  .priority-rank.r2 { background: #d97706; }
+
+  .daily-list-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; display: flex; gap: 16px; align-items: flex-start; }
+  .daily-date { font-size: 13px; font-weight: 700; color: var(--gray-500); min-width: 90px; }
+  .daily-summary { flex: 1; font-size: 13px; color: var(--gray-700); line-height: 1.5; }
+  .mini-kpi { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+  .mini-kpi-item { font-size: 11px; background: var(--gray-100); padding: 2px 8px; border-radius: 10px; color: var(--gray-700); font-weight: 600; }
+
+  .summary-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; font-size: 14px; line-height: 1.8; white-space: pre-line; color: #0c4a6e; }
 </style>
 </head>
 <body>
@@ -175,6 +215,9 @@
       </div>
       <div class="nav-item" onclick="showPage('analyze')">
         <span class="nav-icon">🔍</span> 親和性分析
+      </div>
+      <div class="nav-item" onclick="showPage('reports')">
+        <span class="nav-icon">📊</span> 営業レポート
       </div>
       <div class="nav-item" onclick="showPage('settings')">
         <span class="nav-icon">⚙️</span> 設定
@@ -254,6 +297,88 @@
         </div>
       </div>
       <div id="analysis-result"></div>
+    </div>
+
+    <!-- ── 営業レポート ── -->
+    <div id="page-reports" class="page">
+      <div class="page-header">
+        <div class="page-title">📊 営業レポート</div>
+      </div>
+
+      <!-- API Key -->
+      <div class="apikey-section">
+        <label>🔑 Anthropic API Key</label>
+        <div class="apikey-input-wrap">
+          <input type="password" class="form-control" id="report-api-key" placeholder="sk-ant-..." style="flex:1;">
+          <button class="btn btn-outline btn-sm" onclick="toggleReportKey()">表示</button>
+        </div>
+      </div>
+
+      <!-- タブ切替 -->
+      <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid var(--gray-200);padding-bottom:0;">
+        <div id="rtab-daily" class="report-tab active-tab" onclick="switchReportTab('daily')">📝 日報入力</div>
+        <div id="rtab-list" class="report-tab" onclick="switchReportTab('list')">📋 日報一覧</div>
+        <div id="rtab-weekly" class="report-tab" onclick="switchReportTab('weekly')">📆 週報</div>
+        <div id="rtab-monthly" class="report-tab" onclick="switchReportTab('monthly')">📅 月報</div>
+      </div>
+
+      <!-- 日報入力 -->
+      <div id="rpanel-daily">
+        <div class="card">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">日付</label>
+              <input type="date" class="form-control" id="report-date">
+            </div>
+            <div style="display:flex;align-items:flex-end;">
+              <button class="btn btn-primary" onclick="generateDaily()" style="width:160px;">✨ 日報を生成</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">文字起こし（NottaなどのログをそのままペーストOK）</label>
+            <textarea class="form-control" id="report-transcript" rows="12" placeholder="商談・架電・社内MTGなど、今日の活動の文字起こしをすべて貼り付けてください。複数の会話をまとめてもOKです。"></textarea>
+          </div>
+        </div>
+        <div id="daily-result"></div>
+      </div>
+
+      <!-- 日報一覧 -->
+      <div id="rpanel-list" style="display:none;">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+          <button class="btn btn-outline" onclick="loadDailyList()">🔄 更新</button>
+        </div>
+        <div id="daily-list"></div>
+      </div>
+
+      <!-- 週報 -->
+      <div id="rpanel-weekly" style="display:none;">
+        <div class="card">
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">集計終了日（この日から過去7日）</label>
+              <input type="date" class="form-control" id="weekly-end-date">
+            </div>
+            <button class="btn btn-primary" onclick="generateWeekly()" style="width:160px;height:38px;">📆 週報を生成</button>
+          </div>
+        </div>
+        <div id="weekly-result"></div>
+        <div id="weekly-history"></div>
+      </div>
+
+      <!-- 月報 -->
+      <div id="rpanel-monthly" style="display:none;">
+        <div class="card">
+          <div class="form-row" style="align-items:flex-end;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">集計終了日（この日から過去30日）</label>
+              <input type="date" class="form-control" id="monthly-end-date">
+            </div>
+            <button class="btn btn-primary" onclick="generateMonthly()" style="width:160px;height:38px;">📅 月報を生成</button>
+          </div>
+        </div>
+        <div id="monthly-result"></div>
+        <div id="monthly-history"></div>
+      </div>
     </div>
 
     <!-- ── 設定 ── -->
@@ -880,6 +1005,402 @@ function showToast(msg, type = 'success') {
   toast.textContent = msg;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 2500);
+}
+
+// ═══════════════════════════════════════════════
+// 営業レポート
+// ═══════════════════════════════════════════════
+
+document.getElementById('report-date').value = new Date().toISOString().split('T')[0];
+document.getElementById('weekly-end-date').value = new Date().toISOString().split('T')[0];
+document.getElementById('monthly-end-date').value = new Date().toISOString().split('T')[0];
+
+function toggleReportKey() {
+  const el = document.getElementById('report-api-key');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+function switchReportTab(name) {
+  ['daily','list','weekly','monthly'].forEach(t => {
+    document.getElementById('rtab-' + t).classList.remove('active-tab');
+    document.getElementById('rpanel-' + t).style.display = 'none';
+  });
+  document.getElementById('rtab-' + name).classList.add('active-tab');
+  document.getElementById('rpanel-' + name).style.display = 'block';
+  if (name === 'list') loadDailyList();
+  if (name === 'weekly') loadAggregateHistory('weekly');
+  if (name === 'monthly') loadAggregateHistory('monthly');
+}
+
+// ── 日報生成 ──
+async function generateDaily() {
+  const api_key = document.getElementById('report-api-key').value.trim();
+  const transcript = document.getElementById('report-transcript').value.trim();
+  const date = document.getElementById('report-date').value;
+  const resultEl = document.getElementById('daily-result');
+
+  if (!api_key) { showToast('API Keyを入力してください', 'error'); return; }
+  if (!transcript) { showToast('文字起こしを貼り付けてください', 'error'); return; }
+
+  resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> Claude AIが分析中（少々お待ちください）...</div>';
+
+  const res = await fetch('/api/reports/daily', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ api_key, transcript, date })
+  });
+  const data = await res.json();
+
+  if (data.error) {
+    resultEl.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;"><strong style="color:var(--danger);">エラー：</strong>${data.error}</div>`;
+    return;
+  }
+  resultEl.innerHTML = renderDailyReport(data);
+  showToast('日報を生成しました');
+}
+
+function renderDailyReport(d) {
+  const kpis = d.kpis || {};
+  const kv = (v, label) => `
+    <div class="kpi-card">
+      <div class="kpi-value ${v===null||v===undefined?'null-val':''}">${v!==null&&v!==undefined?v:'—'}</div>
+      <div class="kpi-label">${label}</div>
+    </div>`;
+
+  let html = `<div style="margin-top:16px;">`;
+
+  // KPI
+  html += `<div class="kpi-grid">
+    ${kv(kpis.appointments_set,'📅 アポ獲得')}
+    ${kv(kpis.meetings_held,'🤝 商談実施')}
+    ${kv(kpis.contracts,'✅ 受注')}
+    ${kv(kpis.referrals,'🔗 紹介獲得')}
+  </div>`;
+
+  // サマリー
+  if (d.raw_summary) html += `<div class="summary-box">📝 ${d.raw_summary}</div>`;
+
+  // 最優先アクション
+  if (d.priority_actions?.length) {
+    html += `<div class="section-card"><div class="section-card-header">🚨 最優先アクション</div><div class="section-card-body">`;
+    d.priority_actions.forEach(a => {
+      const rc = a.rank === 1 ? 'r1' : a.rank === 2 ? 'r2' : '';
+      html += `<div class="item-row blue" style="display:flex;gap:8px;align-items:flex-start;">
+        <span class="priority-rank ${rc}">${a.rank}</span>
+        <div>
+          <div class="item-text" style="font-weight:600;">${a.action}</div>
+          ${a.expected_outcome?`<div class="item-sub">期待成果：${a.expected_outcome}</div>`:''}
+          ${a.deadline?`<div class="item-sub">⏰ ${a.deadline}</div>`:''}
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 紹介情報
+  if (d.referral_mentions?.length) {
+    html += `<div class="section-card"><div class="section-card-header" style="color:#7c3aed;">🔗 紹介・リファラル情報</div><div class="section-card-body">`;
+    d.referral_mentions.forEach(r => {
+      html += `<div class="item-row purple">
+        <div class="item-text">${r.context}</div>
+        ${r.person?`<div class="item-sub">関係者：${r.person}</div>`:''}
+        ${r.status?`<div class="item-sub"><span class="badge badge-purple">${r.status}</span></div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 勝ちパターン
+  if (d.win_patterns?.length) {
+    html += `<div class="section-card"><div class="section-card-header" style="color:#16a34a;">✅ 勝ちパターン</div><div class="section-card-body">`;
+    d.win_patterns.forEach(w => {
+      html += `<div class="item-row green">
+        <div class="item-text" style="font-weight:600;">${w.pattern}</div>
+        ${w.condition?`<div class="item-sub">条件：${w.condition}</div>`:''}
+        ${w.evidence?`<div class="item-sub">根拠：${w.evidence}</div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // NGパターン
+  if (d.ng_patterns?.length) {
+    html += `<div class="section-card"><div class="section-card-header" style="color:#dc2626;">❌ NGパターン・改善点</div><div class="section-card-body">`;
+    d.ng_patterns.forEach(n => {
+      html += `<div class="item-row red">
+        <div class="item-text" style="font-weight:600;">${n.pattern}</div>
+        ${n.reason?`<div class="item-sub">原因：${n.reason}</div>`:''}
+        ${n.improvement?`<div class="item-sub" style="color:#16a34a;">→ 改善：${n.improvement}</div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 課題
+  if (d.issues?.length) {
+    html += `<div class="section-card"><div class="section-card-header" style="color:#d97706;">⚠️ 課題</div><div class="section-card-body">`;
+    d.issues.forEach(i => {
+      html += `<div class="item-row orange">
+        <div class="item-text" style="font-weight:600;">${i.issue}</div>
+        ${i.impact?`<div class="item-sub">影響：${i.impact}</div>`:''}
+        ${i.action_needed?`<div class="item-sub" style="color:#dc2626;">対策：${i.action_needed}</div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 気づき
+  if (d.insights?.length) {
+    html += `<div class="section-card"><div class="section-card-header">💡 気づき・学び</div><div class="section-card-body">`;
+    d.insights.forEach(i => {
+      html += `<div class="item-row">
+        <div class="item-text">${i.insight}</div>
+        ${i.applicable_to?`<div class="item-sub">使える場面：${i.applicable_to}</div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 行動記録
+  if (d.actions?.length) {
+    html += `<div class="section-card"><div class="section-card-header">📋 行動記録</div><div class="section-card-body">`;
+    d.actions.forEach(a => {
+      html += `<div class="item-row">
+        <div class="item-text" style="font-weight:600;">${a.action}</div>
+        ${a.result?`<div class="item-sub">結果：${a.result}</div>`:''}
+        ${a.next_step?`<div class="item-sub" style="color:var(--primary);">次：${a.next_step}</div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+// ── 日報一覧 ──
+async function loadDailyList() {
+  const el = document.getElementById('daily-list');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> 読み込み中...</div>';
+  const res = await fetch('/api/reports/daily');
+  const list = await res.json();
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">日報がまだありません</div></div>';
+    return;
+  }
+  el.innerHTML = list.map(r => {
+    const kpis = [];
+    if (r.appointments_set !== null && r.appointments_set !== undefined) kpis.push(`📅 アポ ${r.appointments_set}`);
+    if (r.meetings_held !== null && r.meetings_held !== undefined) kpis.push(`🤝 商談 ${r.meetings_held}`);
+    if (r.contracts !== null && r.contracts !== undefined) kpis.push(`✅ 受注 ${r.contracts}`);
+    if (r.referrals !== null && r.referrals !== undefined) kpis.push(`🔗 紹介 ${r.referrals}`);
+    if (r.referral_count > 0) kpis.push(`💬 紹介言及 ${r.referral_count}件`);
+    return `<div class="daily-list-card">
+      <div class="daily-date">${r.date}</div>
+      <div style="flex:1;">
+        <div class="daily-summary">${r.raw_summary || '（サマリーなし）'}</div>
+        <div class="mini-kpi">${kpis.map(k=>`<span class="mini-kpi-item">${k}</span>`).join('')}</div>
+        ${r.priority_actions?.length ? `<div style="margin-top:6px;font-size:12px;color:var(--primary);">→ ${r.priority_actions[0]?.action||''}</div>` : ''}
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteDailyReport(${r.id})">削除</button>
+    </div>`;
+  }).join('');
+}
+
+async function deleteDailyReport(id) {
+  if (!confirm('この日報を削除しますか？')) return;
+  await fetch('/api/reports/daily/' + id, { method: 'DELETE' });
+  loadDailyList();
+  showToast('削除しました');
+}
+
+// ── 週報生成 ──
+async function generateWeekly() {
+  const api_key = document.getElementById('report-api-key').value.trim();
+  const end_date = document.getElementById('weekly-end-date').value;
+  if (!api_key) { showToast('API Keyを入力してください', 'error'); return; }
+
+  const el = document.getElementById('weekly-result');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> 週報を生成中...</div>';
+
+  const res = await fetch('/api/reports/weekly', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ api_key, end_date })
+  });
+  const data = await res.json();
+  if (data.error) {
+    el.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;"><strong style="color:var(--danger);">エラー：</strong>${data.error}</div>`;
+    return;
+  }
+  el.innerHTML = renderAggregateReport(data, 'weekly');
+  showToast('週報を生成しました');
+}
+
+// ── 月報生成 ──
+async function generateMonthly() {
+  const api_key = document.getElementById('report-api-key').value.trim();
+  const end_date = document.getElementById('monthly-end-date').value;
+  if (!api_key) { showToast('API Keyを入力してください', 'error'); return; }
+
+  const el = document.getElementById('monthly-result');
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> 月報を生成中...</div>';
+
+  const res = await fetch('/api/reports/monthly', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ api_key, end_date })
+  });
+  const data = await res.json();
+  if (data.error) {
+    el.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;"><strong style="color:var(--danger);">エラー：</strong>${data.error}</div>`;
+    return;
+  }
+  el.innerHTML = renderAggregateReport(data, 'monthly');
+  showToast('月報を生成しました');
+}
+
+function renderAggregateReport(d, type) {
+  const kpi = d.kpi_summary || {};
+  const kv = (v, label) => `
+    <div class="kpi-card">
+      <div class="kpi-value ${!v?'null-val':''}">${v||'—'}</div>
+      <div class="kpi-label">${label}</div>
+    </div>`;
+
+  let html = `<div style="margin-top:16px;">`;
+  const p = d.period || {};
+  html += `<div style="font-size:13px;color:var(--gray-500);margin-bottom:12px;">📆 ${p.start||''} 〜 ${p.end||''}</div>`;
+
+  // KPI
+  html += `<div class="kpi-grid">
+    ${kv(kpi.appointments_set,'📅 アポ獲得')}
+    ${kv(kpi.meetings_held,'🤝 商談実施')}
+    ${kv(kpi.contracts,'✅ 受注')}
+    ${kv(kpi.referrals,'🔗 紹介獲得')}
+  </div>`;
+
+  // 転換率
+  if (kpi.conversion_appo_to_meeting || kpi.conversion_meeting_to_contract) {
+    html += `<div style="display:flex;gap:10px;margin-bottom:16px;">
+      ${kpi.conversion_appo_to_meeting ? `<div class="card" style="flex:1;text-align:center;padding:12px;"><div style="font-size:20px;font-weight:800;color:var(--primary);">${kpi.conversion_appo_to_meeting}</div><div style="font-size:12px;color:var(--gray-500);">アポ→商談転換率</div></div>`:''}
+      ${kpi.conversion_meeting_to_contract ? `<div class="card" style="flex:1;text-align:center;padding:12px;"><div style="font-size:20px;font-weight:800;color:var(--success);">${kpi.conversion_meeting_to_contract}</div><div style="font-size:12px;color:var(--gray-500);">商談→受注転換率</div></div>`:''}
+    </div>`;
+  }
+
+  // サマリー
+  const summary = d.weekly_summary || d.monthly_summary;
+  if (summary) html += `<div class="summary-box">${summary}</div>`;
+
+  // 最優先アクション
+  if (d.priority_actions?.length) {
+    html += `<div class="section-card"><div class="section-card-header">🚨 最優先アクション</div><div class="section-card-body">`;
+    d.priority_actions.forEach(a => {
+      const rc = a.rank === 1 ? 'r1' : a.rank === 2 ? 'r2' : '';
+      html += `<div class="item-row blue" style="display:flex;gap:8px;align-items:flex-start;">
+        <span class="priority-rank ${rc}">${a.rank}</span>
+        <div>
+          <div class="item-text" style="font-weight:600;">${a.action}</div>
+          ${a.why?`<div class="item-sub">理由：${a.why}</div>`:''}
+          ${a.expected_outcome?`<div class="item-sub">期待成果：${a.expected_outcome}</div>`:''}
+          ${a.deadline?`<div class="item-sub">⏰ ${a.deadline}</div>`:''}
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // ボトルネック
+  if (d.bottlenecks?.length) {
+    html += `<div class="section-card"><div class="section-card-header" style="color:#d97706;">🔴 ボトルネック</div><div class="section-card-body">`;
+    d.bottlenecks.forEach(b => {
+      html += `<div class="item-row orange">
+        <div class="item-text" style="font-weight:600;">${b.bottleneck}</div>
+        ${b.evidence?`<div class="item-sub">根拠：${b.evidence}</div>`:''}
+        ${b.revenue_impact?`<div class="item-sub" style="color:#dc2626;">影響：${b.revenue_impact}</div>`:''}
+        ${b.solution?`<div class="item-sub" style="color:#16a34a;">解決策：${b.solution}</div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 紹介機会
+  const refs = d.referral_opportunities || d.referral_strategy?.next_month_actions;
+  if (refs?.length) {
+    html += `<div class="section-card"><div class="section-card-header" style="color:#7c3aed;">🔗 紹介・リファラル機会</div><div class="section-card-body">`;
+    refs.forEach(r => {
+      html += `<div class="item-row purple">
+        <div class="item-text" style="font-weight:600;">${r.opportunity || r.action}</div>
+        ${r.person || r.target_person ? `<div class="item-sub">対象：${r.person||r.target_person}</div>`:''}
+        ${r.action && r.opportunity ? `<div class="item-sub" style="color:var(--primary);">アクション：${r.action}</div>`:''}
+        ${r.timing ? `<div class="item-sub">⏰ ${r.timing}</div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // 勝ちパターン（月報はマニュアル形式）
+  const wins = d.win_patterns || d.win_patterns_manual;
+  if (wins?.length) {
+    html += `<div class="section-card"><div class="section-card-header" style="color:#16a34a;">✅ 勝ちパターン</div><div class="section-card-body">`;
+    wins.forEach(w => {
+      html += `<div class="item-row green">
+        <div class="item-text" style="font-weight:600;">${w.pattern || w.pattern_name}</div>
+        ${w.condition || w.applicable_to ? `<div class="item-sub">条件：${w.condition||w.applicable_to}</div>`:''}
+        ${w.how_to_replicate ? `<div class="item-sub">再現方法：${w.how_to_replicate}</div>`:''}
+        ${w.steps?.length ? `<div class="item-sub">手順：${w.steps.join(' → ')}</div>`:''}
+        ${w.key_phrases?.length ? `<div class="item-sub">キーフレーズ：「${w.key_phrases.join('」「')}」</div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // NGパターン
+  if (d.ng_patterns?.length) {
+    html += `<div class="section-card"><div class="section-card-header" style="color:#dc2626;">❌ NGパターン</div><div class="section-card-body">`;
+    d.ng_patterns.forEach(n => {
+      html += `<div class="item-row red">
+        <div class="item-text" style="font-weight:600;">${n.pattern}</div>
+        ${n.root_cause ? `<div class="item-sub">根本原因：${n.root_cause}</div>`:''}
+        ${n.how_to_avoid ? `<div class="item-sub" style="color:#16a34a;">回避方法：${n.how_to_avoid}</div>`:''}
+      </div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  // トレンド分析（月報のみ）
+  if (d.trend_analysis) {
+    const t = d.trend_analysis;
+    html += `<div class="section-card"><div class="section-card-header">📈 トレンド分析</div><div class="section-card-body">`;
+    if (t.overall_trend) html += `<div class="item-row"><div class="item-text">${t.overall_trend}</div></div>`;
+    if (t.improving_areas?.length) html += `<div style="margin-top:8px;"><div class="item-label" style="color:#16a34a;">▲ 改善傾向</div>${t.improving_areas.map(a=>`<div style="font-size:13px;padding:2px 0;">✓ ${a}</div>`).join('')}</div>`;
+    if (t.declining_areas?.length) html += `<div style="margin-top:8px;"><div class="item-label" style="color:#dc2626;">▼ 悪化傾向</div>${t.declining_areas.map(a=>`<div style="font-size:13px;padding:2px 0;">✗ ${a}</div>`).join('')}</div>`;
+    html += `</div></div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+async function loadAggregateHistory(type) {
+  const el = document.getElementById(type + '-history');
+  const res = await fetch('/api/reports/aggregate?type=' + type);
+  const list = await res.json();
+  if (!list.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div style="font-size:14px;font-weight:700;margin:20px 0 10px;">過去の${type==='weekly'?'週報':'月報'}</div>` +
+    list.map(r => `
+      <div class="daily-list-card">
+        <div class="daily-date" style="min-width:160px;">${r.start_date} 〜 ${r.end_date}</div>
+        <div class="daily-summary">${r.summary_text?.slice(0,100)||''}${r.summary_text?.length>100?'…':''}</div>
+        <button class="btn btn-danger btn-sm" onclick="deleteAggReport(${r.id}, '${type}')">削除</button>
+      </div>`).join('');
+}
+
+async function deleteAggReport(id, type) {
+  if (!confirm('削除しますか？')) return;
+  await fetch('/api/reports/aggregate/' + id, { method: 'DELETE' });
+  loadAggregateHistory(type);
+  showToast('削除しました');
 }
 
 // 外側クリックでモーダルを閉じる

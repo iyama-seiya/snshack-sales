@@ -1,5 +1,5 @@
 """
-アポイント管理 + 文字起こし親和性分析ツール
+アポイント管理 + 文字起こし親和性分析 + 営業レポート自動生成ツール
 """
 import os
 import json
@@ -7,8 +7,10 @@ import sqlite3
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template_string
 import anthropic
+from reports_bp import reports_bp
 
 app = Flask(__name__)
+app.register_blueprint(reports_bp)
 DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
 
 # ─────────────────────────────────────────────
@@ -56,6 +58,27 @@ def init_db():
         CREATE TABLE IF NOT EXISTS tags (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS daily_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL UNIQUE,
+            raw_transcript TEXT,
+            structured_json TEXT,
+            appointments_set INTEGER,
+            meetings_held INTEGER,
+            contracts INTEGER,
+            referrals INTEGER,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS aggregate_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT NOT NULL,
+            start_date TEXT,
+            end_date TEXT,
+            analysis_json TEXT,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
         );
     """)
 
