@@ -324,42 +324,15 @@
 
       <!-- 日報入力 -->
       <div id="rpanel-daily">
-        <!-- モード切替 -->
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
-          <button id="mode-btn-ai" class="btn btn-primary" onclick="setDailyMode('ai')">✨ AIで自動生成</button>
-          <button id="mode-btn-manual" class="btn btn-outline" onclick="setDailyMode('manual')">✏️ 手入力（無料）</button>
-        </div>
-
-        <!-- AIモード -->
-        <div id="daily-ai-panel" class="card">
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">日付</label>
-              <input type="date" class="form-control" id="report-date">
-            </div>
-            <div style="display:flex;align-items:flex-end;">
-              <button class="btn btn-primary" onclick="generateDaily()" style="width:160px;">✨ 日報を生成</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">文字起こし（NottaなどのログをそのままペーストOK）</label>
-            <textarea class="form-control" id="report-transcript" rows="12" placeholder="商談・架電・社内MTGなど、今日の活動の文字起こしをすべて貼り付けてください。複数の会話をまとめてもOKです。"></textarea>
-          </div>
-        </div>
-
-        <!-- マニュアルモード -->
-        <div id="daily-manual-panel" class="card" style="display:none;">
-          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#15803d;">
-            ✅ API Key不要・完全無料で使えます
-          </div>
-          <div class="form-row">
-            <div class="form-group">
+        <div class="card">
+          <div class="form-row" style="align-items:center;margin-bottom:4px;">
+            <div class="form-group" style="margin-bottom:0;">
               <label class="form-label">日付</label>
               <input type="date" class="form-control" id="manual-date">
             </div>
           </div>
           <!-- KPI -->
-          <div class="form-row" style="grid-template-columns:repeat(4,1fr);">
+          <div class="form-row" style="grid-template-columns:repeat(4,1fr);margin-top:14px;">
             <div class="form-group">
               <label class="form-label">📅 アポ獲得数</label>
               <input type="number" class="form-control" id="m-appo" min="0" placeholder="0">
@@ -378,11 +351,11 @@
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">📝 今日のサマリー（3行以内）</label>
-            <textarea class="form-control" id="m-summary" rows="3" placeholder="例：A社初回商談でニーズ確認、B社からC社を紹介してもらえそう、夕方の架電は全滅"></textarea>
+            <label class="form-label">📝 今日のサマリー</label>
+            <textarea class="form-control" id="m-summary" rows="3" placeholder="例：A社初回商談でニーズ確認、B社から紹介をもらえそう、架電は3件無応答"></textarea>
           </div>
           <div class="form-group">
-            <label class="form-label">🚨 最優先アクション（1行ずつ、最大3件）</label>
+            <label class="form-label">🚨 最優先アクション（最大3件）</label>
             <input class="form-control" id="m-p1" placeholder="例：明日A社に提案書を送る" style="margin-bottom:6px;">
             <input class="form-control" id="m-p2" placeholder="例：B社に紹介の件をフォロー" style="margin-bottom:6px;">
             <input class="form-control" id="m-p3" placeholder="例：未返信の3社にリマインド">
@@ -411,7 +384,6 @@
             <button class="btn btn-success" onclick="saveManualDaily()" style="width:160px;">💾 保存する</button>
           </div>
         </div>
-
         <div id="daily-result"></div>
       </div>
 
@@ -1085,20 +1057,9 @@ function showToast(msg, type = 'success') {
 // ═══════════════════════════════════════════════
 
 const today = new Date().toISOString().split('T')[0];
-document.getElementById('report-date').value = today;
 document.getElementById('manual-date').value = today;
 document.getElementById('weekly-end-date').value = today;
 document.getElementById('monthly-end-date').value = today;
-
-// ── モード切替 ──
-function setDailyMode(mode) {
-  const isAI = mode === 'ai';
-  document.getElementById('daily-ai-panel').style.display = isAI ? 'block' : 'none';
-  document.getElementById('daily-manual-panel').style.display = isAI ? 'none' : 'block';
-  document.getElementById('mode-btn-ai').className = isAI ? 'btn btn-primary' : 'btn btn-outline';
-  document.getElementById('mode-btn-manual').className = isAI ? 'btn btn-outline' : 'btn btn-success';
-  document.getElementById('daily-result').innerHTML = '';
-}
 
 // ── マニュアル日報保存 ──
 async function saveManualDaily() {
@@ -1139,7 +1100,17 @@ async function saveManualDaily() {
     return;
   }
   resultEl.innerHTML = renderDailyReport(data);
-  showToast('日報を保存しました');
+  showToast('日報を保存しました ✅');
+
+  // 翌日の日付をセット
+  const cur = new Date(date + 'T00:00:00');
+  cur.setDate(cur.getDate() + 1);
+  document.getElementById('manual-date').value = cur.toISOString().split('T')[0];
+
+  // フォームをクリア
+  ['m-appo','m-meeting','m-contract','m-referral','m-summary','m-p1','m-p2','m-p3','m-win','m-ng','m-ref','m-issue'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
 }
 
 function toggleReportKey() {
@@ -1159,32 +1130,6 @@ function switchReportTab(name) {
   if (name === 'monthly') loadAggregateHistory('monthly');
 }
 
-// ── 日報生成 ──
-async function generateDaily() {
-  const api_key = document.getElementById('report-api-key').value.trim();
-  const transcript = document.getElementById('report-transcript').value.trim();
-  const date = document.getElementById('report-date').value;
-  const resultEl = document.getElementById('daily-result');
-
-  if (!api_key) { showToast('API Keyを入力してください', 'error'); return; }
-  if (!transcript) { showToast('文字起こしを貼り付けてください', 'error'); return; }
-
-  resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> Claude AIが分析中（少々お待ちください）...</div>';
-
-  const res = await fetch('/api/reports/daily', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ api_key, transcript, date })
-  });
-  const data = await res.json();
-
-  if (data.error) {
-    resultEl.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;"><strong style="color:var(--danger);">エラー：</strong>${data.error}</div>`;
-    return;
-  }
-  resultEl.innerHTML = renderDailyReport(data);
-  showToast('日報を生成しました');
-}
 
 function renderDailyReport(d) {
   const kpis = d.kpis || {};
