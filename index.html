@@ -324,7 +324,14 @@
 
       <!-- 日報入力 -->
       <div id="rpanel-daily">
-        <div class="card">
+        <!-- モード切替 -->
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+          <button id="mode-btn-ai" class="btn btn-primary" onclick="setDailyMode('ai')">✨ AIで自動生成</button>
+          <button id="mode-btn-manual" class="btn btn-outline" onclick="setDailyMode('manual')">✏️ 手入力（無料）</button>
+        </div>
+
+        <!-- AIモード -->
+        <div id="daily-ai-panel" class="card">
           <div class="form-row">
             <div class="form-group">
               <label class="form-label">日付</label>
@@ -339,6 +346,72 @@
             <textarea class="form-control" id="report-transcript" rows="12" placeholder="商談・架電・社内MTGなど、今日の活動の文字起こしをすべて貼り付けてください。複数の会話をまとめてもOKです。"></textarea>
           </div>
         </div>
+
+        <!-- マニュアルモード -->
+        <div id="daily-manual-panel" class="card" style="display:none;">
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#15803d;">
+            ✅ API Key不要・完全無料で使えます
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">日付</label>
+              <input type="date" class="form-control" id="manual-date">
+            </div>
+          </div>
+          <!-- KPI -->
+          <div class="form-row" style="grid-template-columns:repeat(4,1fr);">
+            <div class="form-group">
+              <label class="form-label">📅 アポ獲得数</label>
+              <input type="number" class="form-control" id="m-appo" min="0" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">🤝 商談実施数</label>
+              <input type="number" class="form-control" id="m-meeting" min="0" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">✅ 受注数</label>
+              <input type="number" class="form-control" id="m-contract" min="0" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label">🔗 紹介獲得数</label>
+              <input type="number" class="form-control" id="m-referral" min="0" placeholder="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">📝 今日のサマリー（3行以内）</label>
+            <textarea class="form-control" id="m-summary" rows="3" placeholder="例：A社初回商談でニーズ確認、B社からC社を紹介してもらえそう、夕方の架電は全滅"></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">🚨 最優先アクション（1行ずつ、最大3件）</label>
+            <input class="form-control" id="m-p1" placeholder="例：明日A社に提案書を送る" style="margin-bottom:6px;">
+            <input class="form-control" id="m-p2" placeholder="例：B社に紹介の件をフォロー" style="margin-bottom:6px;">
+            <input class="form-control" id="m-p3" placeholder="例：未返信の3社にリマインド">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">✅ うまくいったこと</label>
+              <textarea class="form-control" id="m-win" rows="3" placeholder="例：○○という言い方をしたら興味を持ってもらえた"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">❌ うまくいかなかったこと</label>
+              <textarea class="form-control" id="m-ng" rows="3" placeholder="例：料金説明のタイミングが早すぎた"></textarea>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">🔗 紹介・リファラル情報</label>
+              <textarea class="form-control" id="m-ref" rows="2" placeholder="例：A社の山田さんがB社を紹介してくれそう"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">⚠️ 課題・懸念</label>
+              <textarea class="form-control" id="m-issue" rows="2" placeholder="例：クロージングまでの期間が長くなっている"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;">
+            <button class="btn btn-success" onclick="saveManualDaily()" style="width:160px;">💾 保存する</button>
+          </div>
+        </div>
+
         <div id="daily-result"></div>
       </div>
 
@@ -1011,9 +1084,63 @@ function showToast(msg, type = 'success') {
 // 営業レポート
 // ═══════════════════════════════════════════════
 
-document.getElementById('report-date').value = new Date().toISOString().split('T')[0];
-document.getElementById('weekly-end-date').value = new Date().toISOString().split('T')[0];
-document.getElementById('monthly-end-date').value = new Date().toISOString().split('T')[0];
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('report-date').value = today;
+document.getElementById('manual-date').value = today;
+document.getElementById('weekly-end-date').value = today;
+document.getElementById('monthly-end-date').value = today;
+
+// ── モード切替 ──
+function setDailyMode(mode) {
+  const isAI = mode === 'ai';
+  document.getElementById('daily-ai-panel').style.display = isAI ? 'block' : 'none';
+  document.getElementById('daily-manual-panel').style.display = isAI ? 'none' : 'block';
+  document.getElementById('mode-btn-ai').className = isAI ? 'btn btn-primary' : 'btn btn-outline';
+  document.getElementById('mode-btn-manual').className = isAI ? 'btn btn-outline' : 'btn btn-success';
+  document.getElementById('daily-result').innerHTML = '';
+}
+
+// ── マニュアル日報保存 ──
+async function saveManualDaily() {
+  const date = document.getElementById('manual-date').value;
+  const toArr = (id) => document.getElementById(id).value.trim()
+    ? document.getElementById(id).value.split('\n').map(s=>s.trim()).filter(Boolean)
+    : [];
+  const toInt = (id) => { const v = document.getElementById(id).value; return v === '' ? null : parseInt(v); };
+
+  const manual = {
+    appointments_set: toInt('m-appo'),
+    meetings_held:    toInt('m-meeting'),
+    contracts:        toInt('m-contract'),
+    referrals:        toInt('m-referral'),
+    raw_summary:      document.getElementById('m-summary').value.trim(),
+    priority_actions: [
+      document.getElementById('m-p1').value.trim(),
+      document.getElementById('m-p2').value.trim(),
+      document.getElementById('m-p3').value.trim(),
+    ].filter(Boolean),
+    win_patterns:     toArr('m-win'),
+    ng_patterns:      toArr('m-ng'),
+    referral_mentions: toArr('m-ref'),
+    issues:           toArr('m-issue'),
+  };
+
+  const resultEl = document.getElementById('daily-result');
+  resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> 保存中...</div>';
+
+  const res = await fetch('/api/reports/daily', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ mode: 'manual', date, manual })
+  });
+  const data = await res.json();
+  if (data.error) {
+    resultEl.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;"><strong style="color:var(--danger);">エラー：</strong>${data.error}</div>`;
+    return;
+  }
+  resultEl.innerHTML = renderDailyReport(data);
+  showToast('日報を保存しました');
+}
 
 function toggleReportKey() {
   const el = document.getElementById('report-api-key');

@@ -206,32 +206,10 @@ def safe_json(text):
 # 日報 API
 # ═══════════════════════════════════════════════
 
-@reports_bp.route("/api/reports/daily", methods=["POST"])
-def create_daily_report():
-    data = request.json
-    transcript = data.get("transcript", "").strip()
-    api_key = data.get("api_key", "").strip()
-    date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
-
-    if not transcript:
-        return jsonify({"error": "文字起こしが空です"}), 400
-    if not api_key:
-        return jsonify({"error": "API Keyを入力してください"}), 400
-
-    prompt = DAILY_PROMPT.format(transcript=transcript, date=date)
-    try:
-        result_text = call_claude(api_key, prompt, max_tokens=4000)
-        structured = safe_json(result_text)
-    except json.JSONDecodeError:
-        return jsonify({"error": "AI出力のパースに失敗しました", "raw": result_text}), 500
-    except anthropic.AuthenticationError:
-        return jsonify({"error": "APIキーが無効です"}), 401
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+def _save_daily(date, transcript, structured):
+    """日報をDBに保存（新規 or 上書き）"""
     kpis = structured.get("kpis", {})
     conn = get_db()
-    # 同日レポートは上書き
     existing = conn.execute("SELECT id FROM daily_reports WHERE date=?", (date,)).fetchone()
     if existing:
         conn.execute(
@@ -255,9 +233,69 @@ def create_daily_report():
         report_id = cur.lastrowid
     conn.commit()
     conn.close()
+    return report_id
 
+
+@reports_bp.route("/api/reports/daily", methods=["POST"])
+def create_daily_report():
+    data = request.json
+    date = data.get("date", datetime.now().strftime("%Y-%m-%d"))
+    mode = data.get("mode", "ai")  # "ai" or "manual"
+
+    # ── マニュアルモード（API Key不要）──
+    if mode == "manual":
+        manual = data.get("manual", {})
+        structured = {
+            "date": date,
+            "kpis": {
+                "appointments_set": _to_int(manual.get("appointments_set")),
+                "meetings_held":    _to_int(manual.get("meetings_held")),
+                "contracts":        _to_int(manual.get("contracts")),
+                "referrals":        _to_int(manual.get("referrals")),
+            },
+            "actions":          [{"action": a, "result": None, "next_step": None} for a in manual.get("actions", []) if a],
+            "issues":           [{"issue": i, "impact": None, "action_needed": None} for i in manual.get("issues", []) if i],
+            "insights":         [{"insight": i, "applicable_to": None} for i in manual.get("insights", []) if i],
+            "referral_mentions":[{"context": r, "person": None, "status": None} for r in manual.get("referral_mentions", []) if r],
+            "win_patterns":     [{"pattern": w, "condition": None, "evidence": None} for w in manual.get("win_patterns", []) if w],
+            "ng_patterns":      [{"pattern": n, "reason": None, "improvement": None} for n in manual.get("ng_patterns", []) if n],
+            "priority_actions": [{"rank": i+1, "action": a, "expected_outcome": None, "deadline": None} for i, a in enumerate(manual.get("priority_actions", [])) if a],
+            "raw_summary":      manual.get("raw_summary", ""),
+        }
+        report_id = _save_daily(date, "", structured)
+        structured["id"] = report_id
+        return jsonify(structured)
+
+    # ── AIモード ──
+    transcript = data.get("transcript", "").strip()
+    api_key = data.get("api_key", "").strip()
+
+    if not transcript:
+        return jsonify({"error": "文字起こしが空です"}), 400
+    if not api_key:
+        return jsonify({"error": "API Keyを入力してください"}), 400
+
+    prompt = DAILY_PROMPT.format(transcript=transcript, date=date)
+    try:
+        result_text = call_claude(api_key, prompt, max_tokens=4000)
+        structured = safe_json(result_text)
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI出力のパースに失敗しました", "raw": result_text}), 500
+    except anthropic.AuthenticationError:
+        return jsonify({"error": "APIキーが無効です"}), 401
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    report_id = _save_daily(date, transcript, structured)
     structured["id"] = report_id
     return jsonify(structured)
+
+
+def _to_int(v):
+    try:
+        return int(v) if v not in (None, "", "null") else None
+    except (ValueError, TypeError):
+        return None
 
 
 @reports_bp.route("/api/reports/daily", methods=["GET"])
