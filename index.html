@@ -1008,19 +1008,18 @@ async function runAnalysis(mode) {
 
   if (isFree) {
     html += `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#166534;">
-      🆓 <strong>無料モード（キーワードマッチ）</strong> — API不要。コンタクトの業種・役職・タグ・メモとのキーワード一致で採点しています。
+      🆓 <strong>文脈マッチ分析</strong> — 「なぜ自分に？」と思わせない紹介相手を、業界・立場・課題・関係の文脈で判定しています。
     </div>`;
   }
 
   html += `<div class="analysis-meta">
-    <h4>📊 文字起こし分析</h4>
-    <div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">主要キーワード：</strong>
+    <h4>📊 会話から読み取ったテーマ</h4>
+    <div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">主なテーマ：</strong>
       <div class="chip-list" style="margin-top:4px;">${(ta.main_topics||[]).map(t=>`<span class="chip">${t}</span>`).join('')}</div>
     </div>
     <div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">関連ワード：</strong>
-      <div class="chip-list" style="margin-top:4px;">${(ta.needs_and_concerns||[]).map(t=>`<span class="chip">⚠️ ${t}</span>`).join('')}</div>
+      <div class="chip-list" style="margin-top:4px;">${(ta.needs_and_concerns||[]).map(t=>`<span class="chip">${t}</span>`).join('')}</div>
     </div>
-    ${ta.industry_context ? `<div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">分析モード：</strong> ${ta.industry_context}</div>` : ''}
     <div><strong style="font-size:12px;color:#0369a1;">検出キーワード：</strong>
       <div class="chip-list" style="margin-top:4px;">${(ta.keywords||[]).map(k=>`<span class="chip">${k}</span>`).join('')}</div>
     </div>
@@ -1029,21 +1028,21 @@ async function runAnalysis(mode) {
   if (!ranked.length) {
     html += `<div class="card" style="border-color:#e5e7eb;">
       <div class="empty-state">
-        <div class="empty-state-icon">🔍</div>
-        <div class="empty-state-text" style="font-weight:700;margin-bottom:8px;">該当するコンタクトが見つかりませんでした</div>
-        <div style="font-size:13px;color:var(--gray-500);text-align:left;max-width:400px;">
-          <p style="margin-bottom:6px;">精度を上げるには、コンタクトに以下を登録してください：</p>
-          <ul style="padding-left:18px;line-height:1.8;">
-            <li>業種（例：IT・ソフトウェア、人材 など）</li>
-            <li>役職（例：営業部長、代表取締役 など）</li>
-            <li>タグ・カテゴリー</li>
-            <li>メモ欄（課題・ニーズ・関心事）</li>
+        <div class="empty-state-icon">🤝</div>
+        <div class="empty-state-text" style="font-weight:700;margin-bottom:8px;">「なぜ自分に？」と思わせない紹介相手が見つかりませんでした</div>
+        <div style="font-size:13px;color:var(--gray-500);text-align:left;max-width:420px;">
+          <p style="margin-bottom:6px;">精度を上げるには、コンタクトに「文脈」を登録してください：</p>
+          <ul style="padding-left:18px;line-height:2;">
+            <li><strong>業種</strong>（その人の世界観を示す）</li>
+            <li><strong>役職</strong>（その人のポジション・立場）</li>
+            <li><strong>メモ</strong>（今まさに取り組んでいる課題・関心事）</li>
+            <li><strong>タグ</strong>（関心領域のキーワード）</li>
           </ul>
         </div>
       </div>
     </div>`;
   } else {
-    html += `<div style="font-size:14px;font-weight:700;margin-bottom:12px;">🏆 親和性ランキング（${ranked.length}件）</div>`;
+    html += `<div style="font-size:14px;font-weight:700;margin-bottom:12px;">🤝 紹介候補（文脈が一致する順）${ranked.length}件</div>`;
     ranked.forEach(r => {
       const score = r.affinity_score || 0;
       const colorClass = score >= 75 ? '' : score >= 55 ? 'mid' : 'low';
@@ -1056,16 +1055,17 @@ async function runAnalysis(mode) {
             <div class="rank-company">${r.company||''}</div>
             <div class="rank-score">
               <span class="badge ${score>=75?'badge-green':score>=55?'badge-yellow':'badge-red'}">
-                ${r.affinity_level} ${score}点
+                文脈一致度 ${score}%
               </span>
               <div class="score-bar">
                 <div class="score-fill ${colorClass}" style="width:${score}%"></div>
               </div>
             </div>
+            <div style="font-size:12px;font-weight:600;color:var(--gray-700);margin:8px 0 4px;">「なぜこの人か」の根拠</div>
             <div class="rank-reasons">
               ${(r.reasons||[]).map(reason => `<div class="rank-reason-item">${reason}</div>`).join('')}
             </div>
-            ${r.suggested_approach ? `<div class="rank-approach">💡 ${r.suggested_approach}</div>` : ''}
+            ${r.suggested_approach ? `<div class="rank-approach">🗣️ 自然な紹介の切り口：${r.suggested_approach}</div>` : ''}
           </div>
         </div>
       `;

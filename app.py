@@ -513,47 +513,84 @@ def analyze_free():
                 word_freq[w] = word_freq.get(w, 0) + 1
         top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
 
-        # ── 各コンタクトをスコアリング ──
+        # ══════════════════════════════════════════
+        # 選定基準：「なぜ自分に？」と思わせない紹介
+        # = 紹介の理由がその人の文脈と完全に一致している状態
+        #
+        # 軸①【業界・テーマ一致】その人の世界観の中に、この話題が自然に存在するか
+        # 軸②【役割・立場一致】 その人のポジションから見て、この紹介は自分ごとになるか
+        # 軸③【課題・関心一致】 今まさにその人が向き合っているテーマと重なるか（メモ・タグ）
+        # 軸④【関係の文脈継続】 過去のやりとりの延長線上にある紹介か
+        # ══════════════════════════════════════════
         scored = []
         for contact in contact_list:
             score = 0
-            reasons = []
+            reasons = []  # 「なぜこの人か」の根拠リスト
 
-            checks = [
-                (contact.get('industry') or '', 30, '業種',
-                 lambda v, kws: f"業種「{v}」が会話の内容と一致 → {v}分野の話題が含まれています"),
-                (contact.get('role')     or '', 20, '役職',
-                 lambda v, kws: f"役職「{v}」が関連 → この会話の相手に近い立場の方です"),
-                (contact.get('company')  or '', 15, '会社名',
-                 lambda v, kws: f"会社名「{v}」がキーワードと一致"),
-                (contact.get('notes')    or '', 10, 'メモ',
-                 lambda v, kws: f"登録メモに関連情報あり（「{'、'.join(kws[:2])}」）"),
-            ]
-            for val, weight, label, reason_fn in checks:
-                if not val:
-                    continue
-                matched = [kw for kw in keywords if kw in val]
+            name     = contact.get('name', '')
+            industry = contact.get('industry') or ''
+            role     = contact.get('role')     or ''
+            company  = contact.get('company')  or ''
+            notes    = contact.get('notes')    or ''
+
+            # 軸① 業界・テーマ一致（最重要：その人の世界観にこの話題が存在するか）
+            if industry:
+                matched = [kw for kw in keywords if kw in industry]
                 if matched:
-                    score += weight * len(matched)
-                    reasons.append(reason_fn(val, matched))
+                    score += 40 * len(matched)
+                    reasons.append(
+                        f"【業界一致】{industry}の方なので、この話題は"自分ごと"として受け取れる"
+                    )
 
+            # 軸② 役割・立場一致（その人のポジションから見て紹介が自然か）
+            if role:
+                matched = [kw for kw in keywords if kw in role]
+                if matched:
+                    score += 35 * len(matched)
+                    reasons.append(
+                        f"【立場一致】{role}として、この内容は直接関わるテーマ"
+                    )
+
+            # 軸③ 課題・関心一致（メモ：今まさに向き合っているテーマか）
+            if notes:
+                matched = [kw for kw in keywords if kw in notes]
+                if matched:
+                    score += 30 * len(matched)
+                    reasons.append(
+                        f"【課題一致】メモに「{'・'.join(matched[:3])}」とあり、"
+                        f"今まさに取り組んでいるテーマと重なる"
+                    )
+
+            # 軸③ 課題・関心一致（タグ：ユーザーが意図的につけた関心ラベル）
             for tag in contact.get('categories', []):
                 matched = [kw for kw in keywords if kw in tag]
                 if matched:
-                    score += 25
-                    reasons.append(f"タグ「{tag}」が会話内容と合致 → このキーワードで接点があります")
+                    score += 28
+                    reasons.append(
+                        f"【関心一致】タグ「{tag}」から、この分野への関心が高い"
+                    )
 
+            # 軸④ 関係の文脈継続（過去アポの延長線上にある紹介か）
             for appo in contact.get('recent_appointments', []):
                 appo_text = (appo.get('title') or '') + ' ' + (appo.get('summary') or '')
                 matched = [kw for kw in keywords if kw in appo_text]
                 if matched:
-                    score += 12
-                    reasons.append(f"過去アポ「{appo.get('title', '')}」と内容が近い → 継続的な関係が見込めます")
+                    score += 20
+                    reasons.append(
+                        f"【文脈継続】過去アポ「{appo.get('title', '')}」の流れと繋がっており、"
+                        f"紹介に自然な文脈がある"
+                    )
+
+            # 会社名だけの一致は低評価（文脈ではなく偶然の一致）
+            if not reasons and company:
+                matched = [kw for kw in keywords if kw in company]
+                if matched:
+                    score += 5
+                    reasons.append(f"【参考】会社名「{company}」がキーワードと一致（文脈確認推奨）")
 
             if score <= 0:
                 continue
 
-            # 最大スコアを正規化（上位の相対スコアで100点換算）
             scored.append((score, contact, reasons))
 
         if not scored:
@@ -561,7 +598,7 @@ def analyze_free():
                 'transcript_analysis': {
                     'main_topics':        [w for w, _ in top_words[:5]],
                     'needs_and_concerns': [w for w, _ in top_words[5:10]],
-                    'industry_context':   'キーワードマッチ（無料モード）',
+                    'industry_context':   '文脈マッチ分析',
                     'keywords':           [w for w, _ in top_words[:15]],
                 },
                 'ranked_contacts': [],
@@ -574,23 +611,34 @@ def analyze_free():
             affinity_score = min(100, max(10, int(raw_score / max_score * 100)))
             affinity_level = '高' if affinity_score >= 70 else '中' if affinity_score >= 40 else '低'
 
+            name     = contact.get('name', '')
             industry = contact.get('industry', '')
-            role = contact.get('role', '')
-            name = contact.get('name', '')
-            parts = []
-            if industry:
-                parts.append(f"{industry}分野の知見を活かしたアプローチが有効")
-            if role:
-                parts.append(f"{role}としての課題・関心に合わせた提案を検討")
-            approach = '。'.join(parts) if parts else f"{name}との過去の接点をもとに連絡を検討"
+            role     = contact.get('role', '')
+
+            # 「自然な紹介の切り口」= 相手が「なぜ自分に？」と思わない一言
+            intro_parts = []
+            if reasons:
+                # 最も強い根拠から切り口を生成
+                top_reason = reasons[0]
+                if '業界一致' in top_reason:
+                    intro_parts.append(f"{industry}の文脈で話が来ているので、この紹介はすぐに腹落ちするはず")
+                elif '立場一致' in top_reason:
+                    intro_parts.append(f"{role}として当然受け取れる話題なので、「なぜ自分に？」は生まれない")
+                elif '課題一致' in top_reason:
+                    intro_parts.append(f"今まさに向き合っている課題なので、タイミングとして最適")
+                elif '関心一致' in top_reason:
+                    intro_parts.append(f"関心領域にドンピシャなので、紹介理由を説明しなくても伝わる")
+                elif '文脈継続' in top_reason:
+                    intro_parts.append(f"過去のやりとりの延長線上にある紹介なので、唐突感がない")
+            approach = intro_parts[0] if intro_parts else f"{name}への紹介理由を整理してから連絡を検討"
 
             ranked.append({
-                'contact_id':       contact['id'],
-                'name':             name,
-                'company':          contact.get('company', ''),
-                'affinity_score':   affinity_score,
-                'affinity_level':   affinity_level,
-                'reasons':          reasons[:4] if reasons else ['複数のキーワードで関連性が検出されました'],
+                'contact_id':         contact['id'],
+                'name':               name,
+                'company':            contact.get('company', ''),
+                'affinity_score':     affinity_score,
+                'affinity_level':     affinity_level,
+                'reasons':            reasons[:4],
                 'suggested_approach': approach,
             })
 
@@ -601,7 +649,7 @@ def analyze_free():
             'transcript_analysis': {
                 'main_topics':        [w for w, _ in top_words[:5]],
                 'needs_and_concerns': [w for w, _ in top_words[5:10]],
-                'industry_context':   'キーワードマッチ（無料モード）',
+                'industry_context':   '文脈マッチ分析',
                 'keywords':           [w for w, _ in top_words[:15]],
             },
             'ranked_contacts': ranked,
