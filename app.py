@@ -416,9 +416,8 @@ def analyze():
 
     try:
         response = client.messages.create(
-            model="claude-opus-4-6",
-            max_tokens=4000,
-            thinking={"type": "adaptive"},
+            model="claude-haiku-4-5",
+            max_tokens=2000,
             messages=[{"role": "user", "content": prompt}]
         )
 
