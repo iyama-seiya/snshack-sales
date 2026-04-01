@@ -309,15 +309,6 @@
         <div class="page-title">📊 営業レポート</div>
       </div>
 
-      <!-- API Key -->
-      <div class="apikey-section">
-        <label>🔑 Anthropic API Key</label>
-        <div class="apikey-input-wrap">
-          <input type="password" class="form-control" id="report-api-key" placeholder="sk-ant-..." style="flex:1;">
-          <button class="btn btn-outline btn-sm" onclick="toggleReportKey()">表示</button>
-        </div>
-      </div>
-
       <!-- タブ切替 -->
       <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:2px solid var(--gray-200);padding-bottom:0;">
         <div id="rtab-daily" class="report-tab active-tab" onclick="switchReportTab('daily')">📝 日報入力</div>
@@ -1135,10 +1126,6 @@ async function saveManualDaily() {
   });
 }
 
-function toggleReportKey() {
-  const el = document.getElementById('report-api-key');
-  el.type = el.type === 'password' ? 'text' : 'password';
-}
 
 function switchReportTab(name) {
   ['daily','list','weekly','monthly'].forEach(t => {
@@ -1310,17 +1297,14 @@ async function deleteDailyReport(id) {
 
 // ── 週報生成 ──
 async function generateWeekly() {
-  const api_key = document.getElementById('report-api-key').value.trim();
   const end_date = document.getElementById('weekly-end-date').value;
-  if (!api_key) { showToast('API Keyを入力してください', 'error'); return; }
-
   const el = document.getElementById('weekly-result');
-  el.innerHTML = '<div class="loading"><div class="spinner"></div> 週報を生成中...</div>';
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> 週報を集計中...</div>';
 
   const res = await fetch('/api/reports/weekly', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ api_key, end_date })
+    body: JSON.stringify({ end_date })
   });
   const data = await res.json();
   if (data.error) {
@@ -1333,17 +1317,14 @@ async function generateWeekly() {
 
 // ── 月報生成 ──
 async function generateMonthly() {
-  const api_key = document.getElementById('report-api-key').value.trim();
   const end_date = document.getElementById('monthly-end-date').value;
-  if (!api_key) { showToast('API Keyを入力してください', 'error'); return; }
-
   const el = document.getElementById('monthly-result');
-  el.innerHTML = '<div class="loading"><div class="spinner"></div> 月報を生成中...</div>';
+  el.innerHTML = '<div class="loading"><div class="spinner"></div> 月報を集計中...</div>';
 
   const res = await fetch('/api/reports/monthly', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ api_key, end_date })
+    body: JSON.stringify({ end_date })
   });
   const data = await res.json();
   if (data.error) {
