@@ -442,6 +442,126 @@ def analyze():
         return jsonify({"error": str(e)}), 500
 
 # ─────────────────────────────────────────────
+# 無料 親和性分析 API（キーワードマッチ）
+# ─────────────────────────────────────────────
+@app.route("/api/analyze/free", methods=["POST"])
+def analyze_free():
+    import re
+    data = request.json
+    transcript = data.get("transcript", "").strip()
+    filter_industry = data.get("industry", "")
+
+    if not transcript:
+        return jsonify({"error": "文字起こしが空です"}), 400
+
+    conn = get_db()
+    query = "SELECT * FROM contacts"
+    params = []
+    if filter_industry:
+        query += " WHERE industry=?"
+        params.append(filter_industry)
+    contacts = conn.execute(query, params).fetchall()
+
+    contact_list = []
+    for c in contacts:
+        cd = dict(c)
+        cd["categories"] = json.loads(cd["categories"]) if cd["categories"] else []
+        appos = conn.execute(
+            "SELECT title, date, summary FROM appointments WHERE contact_id=? ORDER BY date DESC LIMIT 3",
+            (c["id"],)
+        ).fetchall()
+        cd["recent_appointments"] = [dict(a) for a in appos]
+        contact_list.append(cd)
+    conn.close()
+
+    if not contact_list:
+        return jsonify({"error": "コンタクトが登録されていません"}), 400
+
+    # キーワード抽出（2文字以上の語）
+    stop_words = {
+        'です', 'ます', 'ました', 'ません', 'ありがとう', 'よろしく', 'おねがい',
+        'する', 'した', 'して', 'いる', 'いた', 'いて', 'ある', 'あった',
+        'こと', 'もの', 'ため', 'より', 'から', 'まで', 'など', 'として',
+        'ところ', 'それ', 'これ', 'あれ', 'その', 'この', 'ので', 'けど',
+        'でも', 'けれど', 'しかし', 'また', 'さらに', 'そして', 'なので',
+    }
+    raw_words = re.findall(r'[ぁ-んァ-ン一-龥a-zA-Zａ-ｚＡ-Ｚ0-9０-９ー]{2,}', transcript)
+    keywords = set(w for w in raw_words if w not in stop_words)
+
+    # 頻度カウント（分析メタ用）
+    word_freq = {}
+    for w in raw_words:
+        if w not in stop_words:
+            word_freq[w] = word_freq.get(w, 0) + 1
+    top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)
+
+    ranked = []
+    for contact in contact_list:
+        score = 0
+        reasons = []
+
+        field_weights = [
+            ('industry', contact.get('industry') or '', 30, '業種'),
+            ('role',     contact.get('role')     or '', 20, '役職'),
+            ('company',  contact.get('company')  or '', 15, '会社名'),
+            ('notes',    contact.get('notes')    or '', 10, 'メモ'),
+        ]
+        for _, val, weight, label in field_weights:
+            if not val:
+                continue
+            matched = [kw for kw in keywords if kw in val]
+            if matched:
+                score += weight * len(matched)
+                reasons.append(f"{label}「{val}」がキーワード「{'、'.join(matched[:3])}」と一致")
+
+        for tag in contact.get('categories', []):
+            matched = [kw for kw in keywords if kw in tag]
+            if matched:
+                score += 25
+                reasons.append(f"タグ「{tag}」がキーワードと一致")
+
+        for appo in contact.get('recent_appointments', []):
+            appo_text = (appo.get('title') or '') + ' ' + (appo.get('summary') or '')
+            matched = [kw for kw in keywords if kw in appo_text]
+            if matched:
+                score += 10
+                reasons.append(f"過去アポ「{appo.get('title','')}」との関連性あり")
+
+        if score < 15:
+            continue
+
+        affinity_score = min(100, int(score * 1.2))
+        affinity_level = '高' if affinity_score >= 70 else '中' if affinity_score >= 45 else '低'
+        industry = contact.get('industry', '')
+        role = contact.get('role', '')
+        approach = f"{role}として{industry}分野の課題へのアプローチを検討" if (role or industry) else "過去の接点をもとにアプローチを検討"
+
+        ranked.append({
+            'contact_id': contact['id'],
+            'name': contact['name'],
+            'company': contact.get('company', ''),
+            'affinity_score': affinity_score,
+            'affinity_level': affinity_level,
+            'reasons': reasons[:3] if reasons else ['共通するキーワードが検出されました'],
+            'suggested_approach': approach,
+        })
+
+    ranked.sort(key=lambda x: x['affinity_score'], reverse=True)
+    for i, r in enumerate(ranked):
+        r['rank'] = i + 1
+
+    return jsonify({
+        'transcript_analysis': {
+            'main_topics':       [w for w, _ in top_words[:5]],
+            'needs_and_concerns':[w for w, _ in top_words[5:10]],
+            'industry_context':  'キーワードマッチ（無料モード）',
+            'keywords':          [w for w, _ in top_words[:15]],
+        },
+        'ranked_contacts': ranked,
+        'mode': 'free',
+    })
+
+# ─────────────────────────────────────────────
 # 起動
 # ─────────────────────────────────────────────
 if __name__ == "__main__":

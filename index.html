@@ -270,29 +270,33 @@
       <div class="page-header">
         <div class="page-title">🔍 親和性分析</div>
       </div>
-      <div class="apikey-section">
-        <label>🔑 Anthropic API Key（このデバイスのみで使用）</label>
-        <div class="apikey-input-wrap">
-          <input type="password" class="form-control" id="api-key" placeholder="sk-ant-..." style="flex:1;">
-          <button class="btn btn-outline btn-sm" onclick="toggleApiKeyVisibility()">表示</button>
-        </div>
-      </div>
       <div class="card">
         <div class="form-group">
           <label class="form-label">文字起こし（会話ログ・議事録などを貼り付け）</label>
           <textarea class="form-control" id="transcript" rows="10" placeholder="商談・会議・通話などの文字起こしテキストをそのまま貼り付けてください..."></textarea>
         </div>
-        <div class="form-row" style="grid-template-columns: 1fr auto;">
+        <div class="form-row" style="grid-template-columns: 1fr auto; align-items:end; gap:12px;">
           <div>
             <label class="form-label">業種で絞り込み（任意）</label>
             <select class="form-control" id="analyze-industry">
               <option value="">全コンタクトを対象</option>
             </select>
           </div>
-          <div style="display:flex;align-items:flex-end;">
-            <button class="btn btn-primary" onclick="runAnalysis()" style="width:140px;">
-              ✨ 分析する
+          <div style="display:flex;gap:8px;align-items:flex-end;">
+            <button class="btn btn-success" onclick="runAnalysis('free')" style="white-space:nowrap;">
+              🆓 無料で分析
             </button>
+            <button class="btn btn-primary" onclick="runAnalysis('ai')" style="white-space:nowrap;">
+              ✨ AI分析（高精度）
+            </button>
+          </div>
+        </div>
+        <!-- AI分析用 API Key（折りたたみ） -->
+        <div id="ai-key-panel" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--gray-200);">
+          <label class="form-label">🔑 Anthropic API Key（AI分析時のみ必要）</label>
+          <div style="display:flex;gap:8px;">
+            <input type="password" class="form-control" id="api-key" placeholder="sk-ant-..." style="flex:1;">
+            <button class="btn btn-outline btn-sm" onclick="toggleApiKeyVisibility()">表示</button>
           </div>
         </div>
       </div>
@@ -948,23 +952,36 @@ async function deleteAppo(id) {
 // ─────────────────────────────────────────────
 // Analysis
 // ─────────────────────────────────────────────
-async function runAnalysis() {
+async function runAnalysis(mode) {
   const transcript = document.getElementById('transcript').value.trim();
-  const api_key = document.getElementById('api-key').value.trim();
   const industry = document.getElementById('analyze-industry').value;
   const resultEl = document.getElementById('analysis-result');
 
   if (!transcript) { showToast('文字起こしを入力してください', 'error'); return; }
-  if (!api_key) { showToast('API Keyを入力してください', 'error'); return; }
 
-  resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> Claude AIが分析中...</div>';
+  const keyPanel = document.getElementById('ai-key-panel');
+  let data;
 
-  const res = await fetch('/api/analyze', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ transcript, api_key, industry })
-  });
-  const data = await res.json();
+  if (mode === 'ai') {
+    keyPanel.style.display = 'block';
+    const api_key = document.getElementById('api-key').value.trim();
+    if (!api_key) { showToast('AI分析にはAPI Keyが必要です', 'error'); return; }
+    resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> Claude AIが分析中...</div>';
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ transcript, api_key, industry })
+    });
+    data = await res.json();
+  } else {
+    resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> キーワードマッチ分析中...</div>';
+    const res = await fetch('/api/analyze/free', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ transcript, industry })
+    });
+    data = await res.json();
+  }
 
   if (data.error) {
     resultEl.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;"><strong style="color:var(--danger);">エラー：</strong>${data.error}</div>`;
@@ -978,27 +995,32 @@ async function runAnalysis() {
 
   const ta = data.transcript_analysis || {};
   const ranked = data.ranked_contacts || [];
+  const isFree = data.mode === 'free';
 
   let html = '<div class="analysis-result">';
 
-  // 文字起こし分析結果
+  if (isFree) {
+    html += `<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#166534;">
+      🆓 <strong>無料モード（キーワードマッチ）</strong> — API不要。コンタクトの業種・役職・タグ・メモとのキーワード一致で採点しています。
+    </div>`;
+  }
+
   html += `<div class="analysis-meta">
     <h4>📊 文字起こし分析</h4>
-    <div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">主要テーマ：</strong>
+    <div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">主要キーワード：</strong>
       <div class="chip-list" style="margin-top:4px;">${(ta.main_topics||[]).map(t=>`<span class="chip">${t}</span>`).join('')}</div>
     </div>
-    <div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">課題・ニーズ：</strong>
+    <div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">関連ワード：</strong>
       <div class="chip-list" style="margin-top:4px;">${(ta.needs_and_concerns||[]).map(t=>`<span class="chip">⚠️ ${t}</span>`).join('')}</div>
     </div>
-    ${ta.industry_context ? `<div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">業界コンテキスト：</strong> ${ta.industry_context}</div>` : ''}
-    <div><strong style="font-size:12px;color:#0369a1;">キーワード：</strong>
+    ${ta.industry_context ? `<div style="margin-bottom:8px;"><strong style="font-size:12px;color:#0369a1;">分析モード：</strong> ${ta.industry_context}</div>` : ''}
+    <div><strong style="font-size:12px;color:#0369a1;">検出キーワード：</strong>
       <div class="chip-list" style="margin-top:4px;">${(ta.keywords||[]).map(k=>`<span class="chip">${k}</span>`).join('')}</div>
     </div>
   </div>`;
 
-  // ランキング
   if (!ranked.length) {
-    html += '<div class="card"><div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-text">親和性スコア50以上のコンタクトが見つかりませんでした</div></div></div>';
+    html += '<div class="card"><div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-text">一致するコンタクトが見つかりませんでした。コンタクトの業種・役職・メモを充実させると精度が上がります。</div></div></div>';
   } else {
     html += `<div style="font-size:14px;font-weight:700;margin-bottom:12px;">🏆 親和性ランキング（${ranked.length}件）</div>`;
     ranked.forEach(r => {
