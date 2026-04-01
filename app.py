@@ -4,6 +4,7 @@
 import os
 import json
 import sqlite3
+import time
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template_string
 import anthropic
@@ -12,6 +13,9 @@ from reports_bp import reports_bp
 app = Flask(__name__)
 app.register_blueprint(reports_bp)
 DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
+
+# サーバー起動時刻（ブラウザ自動リロード用）
+_START_TIME = str(time.time())
 
 # ─────────────────────────────────────────────
 # DB初期化
@@ -102,6 +106,10 @@ def init_db():
 def index():
     with open(os.path.join(os.path.dirname(__file__), "index.html"), encoding="utf-8") as f:
         return f.read()
+
+@app.route("/api/ping")
+def ping():
+    return jsonify({"v": _START_TIME})
 
 # ─────────────────────────────────────────────
 # 業種 API
@@ -570,4 +578,6 @@ if __name__ == "__main__":
     print("ブラウザで http://localhost:5000 を開いてください")
     print("終了するには Ctrl+C を押してください")
     print("=" * 50)
-    app.run(debug=False, port=5000)
+    BASE = os.path.dirname(__file__)
+    extra = [os.path.join(BASE, "index.html"), os.path.join(BASE, "reports_bp.py")]
+    app.run(debug=False, port=5000, use_reloader=True, extra_files=extra)

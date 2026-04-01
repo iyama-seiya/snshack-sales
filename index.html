@@ -1492,5 +1492,19 @@ document.addEventListener('click', e => {
   }
 });
 </script>
+<script>
+// ── 自動リロード（ファイル変更検知） ──
+(async () => {
+  const res = await fetch('/api/ping');
+  const { v } = await res.json();
+  setInterval(async () => {
+    try {
+      const r = await fetch('/api/ping');
+      const d = await r.json();
+      if (d.v !== v) location.reload();
+    } catch {}
+  }, 2000);
+})();
+</script>
 </body>
 </html>
