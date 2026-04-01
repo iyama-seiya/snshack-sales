@@ -87,7 +87,7 @@ def init_db():
         "IT・ソフトウェア", "製造業", "金融・保険", "不動産",
         "医療・ヘルスケア", "小売・EC", "飲食・食品", "教育",
         "コンサルティング", "広告・マーケティング", "物流・運輸",
-        "エネルギー", "建設・土木", "メディア・エンタメ", "その他"
+        "エネルギー", "建設・土木", "メディア・エンタメ", "人材", "その他"
     ]
     for ind in default_industries:
         c.execute("INSERT OR IGNORE INTO industries(name) VALUES (?)", (ind,))
