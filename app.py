@@ -15,6 +15,15 @@ app = Flask(__name__)
 app.register_blueprint(reports_bp)
 DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
 
+# 全エラーをJSONで返す（HTMLエラーページを返さない）
+@app.errorhandler(Exception)
+def handle_exception(e):
+    return jsonify({"error": str(e)}), 500
+
+@app.errorhandler(404)
+def handle_404(e):
+    return jsonify({"error": "Not found"}), 404
+
 # サーバー起動時刻（ブラウザ自動リロード用）
 _START_TIME = str(time.time())
 

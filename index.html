@@ -953,6 +953,12 @@ async function runAnalysis(mode) {
   const keyPanel = document.getElementById('ai-key-panel');
   let data;
 
+  const safeJson = async (res) => {
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch { throw new Error('サーバーから予期しない応答がありました。ツールを再起動してください。'); }
+  };
+
   try {
     if (mode === 'ai') {
       keyPanel.style.display = 'block';
@@ -964,7 +970,7 @@ async function runAnalysis(mode) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ transcript, api_key, industry })
       });
-      data = await res.json();
+      data = await safeJson(res);
     } else {
       resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> キーワードマッチ分析中...</div>';
       const res = await fetch('/api/analyze/free', {
@@ -972,10 +978,12 @@ async function runAnalysis(mode) {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ transcript, industry })
       });
-      data = await res.json();
+      data = await safeJson(res);
     }
   } catch(e) {
-    resultEl.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;"><strong style="color:var(--danger);">通信エラー：</strong>${e.message}</div>`;
+    resultEl.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;">
+      <strong style="color:var(--danger);">エラー：</strong>${e.message}
+    </div>`;
     return;
   }
 
