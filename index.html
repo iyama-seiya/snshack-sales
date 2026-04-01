@@ -460,6 +460,7 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="contact-id">
+      <!-- 必須・主要項目 -->
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">氏名 *</label>
@@ -480,28 +481,36 @@
           <select class="form-control" id="c-industry"><option value="">-- 選択 --</option></select>
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">メール</label>
-          <input class="form-control" id="c-email" type="email" placeholder="email@example.com">
-        </div>
-        <div class="form-group">
-          <label class="form-label">電話番号</label>
-          <input class="form-control" id="c-phone" placeholder="090-0000-0000">
-        </div>
+      <div class="form-group">
+        <label class="form-label">メモ <span style="font-weight:400;color:var(--gray-500);">— 課題・関心事・今取り組んでいること</span></label>
+        <textarea class="form-control" id="c-notes" rows="3" placeholder="例：採用コストを下げたい / DX推進中 / 紹介で繋がりたい業界がある"></textarea>
       </div>
       <div class="form-group">
         <label class="form-label">タグ</label>
         <div style="position:relative;">
           <div class="tags-container" id="tags-container" onclick="document.getElementById('tag-input').focus()">
-            <input class="tags-input" id="tag-input" placeholder="タグを入力..." oninput="showTagSuggestions()" onkeydown="handleTagKey(event)">
+            <input class="tags-input" id="tag-input" placeholder="タグを入力してEnter…" oninput="showTagSuggestions()" onkeydown="handleTagKey(event)">
           </div>
           <div class="tags-suggestion" id="tag-suggestions" style="display:none;"></div>
         </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">メモ・特記事項</label>
-        <textarea class="form-control" id="c-notes" rows="4" placeholder="課題・関心事・過去の商談内容など..."></textarea>
+      <!-- 連絡先（折りたたみ） -->
+      <div style="margin-top:4px;">
+        <button type="button" onclick="toggleContactInfo()" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--gray-500);padding:0;display:flex;align-items:center;gap:4px;">
+          <span id="contact-info-arrow">▶</span> 連絡先を追加（メール・電話）
+        </button>
+        <div id="contact-info-panel" style="display:none;margin-top:10px;">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">メール</label>
+              <input class="form-control" id="c-email" type="email" placeholder="email@example.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">電話番号</label>
+              <input class="form-control" id="c-phone" placeholder="090-0000-0000">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -522,8 +531,8 @@
       <input type="hidden" id="appo-id">
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">タイトル *</label>
-          <input class="form-control" id="a-title" placeholder="初回商談 / フォローアップなど">
+          <label class="form-label">コンタクト</label>
+          <select class="form-control" id="a-contact"></select>
         </div>
         <div class="form-group">
           <label class="form-label">日付</label>
@@ -531,16 +540,12 @@
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">コンタクト</label>
-        <select class="form-control" id="a-contact"></select>
+        <label class="form-label">タイトル <span style="font-weight:400;color:var(--gray-500);">（空欄で自動生成）</span></label>
+        <input class="form-control" id="a-title" placeholder="初回商談 / フォローアップ など">
       </div>
       <div class="form-group">
-        <label class="form-label">議事録サマリー</label>
-        <textarea class="form-control" id="a-summary" rows="3" placeholder="要点をまとめて入力..."></textarea>
-      </div>
-      <div class="form-group">
-        <label class="form-label">文字起こし（任意）</label>
-        <textarea class="form-control" id="a-transcript" rows="5" placeholder="会話の文字起こしを貼り付け..."></textarea>
+        <label class="form-label">メモ <span style="font-weight:400;color:var(--gray-500);">— 話した内容・次のアクション</span></label>
+        <textarea class="form-control" id="a-summary" rows="4" placeholder="例：課題ヒアリング実施。来週デモを希望。予算感は〇〇万円程度。"></textarea>
       </div>
     </div>
     <div class="modal-footer">
@@ -769,10 +774,13 @@ function renderContacts() {
         ${c.company ? `<strong>${c.company}</strong>` : ''}
         ${c.role ? ` ・ ${c.role}` : ''}
       </div>
-      ${c.industry ? `<span class="badge badge-blue">${c.industry}</span>` : ''}
-      ${c.appo_count ? `<span class="badge badge-green" style="margin-left:4px;">📅 ${c.appo_count}回</span>` : ''}
-      <div class="contact-tags">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
+        ${c.industry ? `<span class="badge badge-blue">${c.industry}</span>` : ''}
+        ${c.appo_count ? `<span class="badge badge-green">📅 ${c.appo_count}回</span>` : ''}
         ${(c.categories||[]).map(t => `<span class="badge badge-gray">${t}</span>`).join('')}
+      </div>
+      <div style="margin-top:8px;" onclick="event.stopPropagation()">
+        <button class="btn btn-outline btn-sm" onclick="openAppoModal({contact_id:${c.id}})">＋ アポ登録</button>
       </div>
     </div>
   `).join('');
@@ -799,7 +807,19 @@ function openContactModal(prefill = {}) {
   document.getElementById('c-industry').value = prefill.industry || '';
   document.getElementById('contact-modal-title').textContent = prefill.id ? 'コンタクト編集' : 'コンタクト登録';
   renderCurrentTags();
+  // 連絡先パネルをリセット（編集時にメール・電話があれば開く）
+  const hasContactInfo = prefill.email || prefill.phone;
+  document.getElementById('contact-info-panel').style.display = hasContactInfo ? 'block' : 'none';
+  document.getElementById('contact-info-arrow').textContent   = hasContactInfo ? '▼' : '▶';
   document.getElementById('contact-modal').classList.add('open');
+}
+
+function toggleContactInfo() {
+  const panel = document.getElementById('contact-info-panel');
+  const arrow = document.getElementById('contact-info-arrow');
+  const open  = panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  arrow.textContent   = open ? '▼' : '▶';
 }
 
 async function saveContact() {
@@ -907,8 +927,11 @@ function openAppoModal(prefill = {}) {
   document.getElementById('a-title').value = prefill.title || '';
   document.getElementById('a-date').value = prefill.date || new Date().toISOString().split('T')[0];
   document.getElementById('a-summary').value = prefill.summary || '';
-  document.getElementById('a-transcript').value = prefill.transcript || '';
-  document.getElementById('a-contact').value = prefill.contact_id || '';
+  // コンタクト選択：prefillにcontact_idがあれば選択状態にする
+  setTimeout(() => {
+    const sel = document.getElementById('a-contact');
+    sel.value = prefill.contact_id || '';
+  }, 50);
   document.getElementById('appo-modal-title').textContent = prefill.id ? 'アポイント編集' : 'アポイント追加';
   document.getElementById('appo-modal').classList.add('open');
 }
@@ -916,16 +939,19 @@ function openAppoModal(prefill = {}) {
 function editAppo(a) { openAppoModal(a); }
 
 async function saveAppo() {
-  const id = document.getElementById('appo-id').value;
+  const id   = document.getElementById('appo-id').value;
+  const date = document.getElementById('a-date').value;
+  // タイトル空欄なら「日付 商談」で自動生成
+  const titleInput = document.getElementById('a-title').value.trim();
+  const title = titleInput || (date ? date + ' 商談' : '商談');
   const data = {
     contact_id: document.getElementById('a-contact').value || null,
-    title: document.getElementById('a-title').value.trim(),
-    date: document.getElementById('a-date').value,
-    summary: document.getElementById('a-summary').value.trim(),
-    transcript: document.getElementById('a-transcript').value.trim(),
+    title,
+    date,
+    summary:    document.getElementById('a-summary').value.trim(),
+    transcript: '',
   };
-  if (!data.title) { showToast('タイトルは必須です', 'error'); return; }
-  const url = id ? '/api/appointments/' + id : '/api/appointments';
+  const url    = id ? '/api/appointments/' + id : '/api/appointments';
   const method = id ? 'PUT' : 'POST';
   await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
   closeModal('appo-modal');
