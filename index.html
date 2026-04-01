@@ -953,25 +953,30 @@ async function runAnalysis(mode) {
   const keyPanel = document.getElementById('ai-key-panel');
   let data;
 
-  if (mode === 'ai') {
-    keyPanel.style.display = 'block';
-    const api_key = document.getElementById('api-key').value.trim();
-    if (!api_key) { showToast('AI分析にはAPI Keyが必要です', 'error'); return; }
-    resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> Claude AIが分析中...</div>';
-    const res = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ transcript, api_key, industry })
-    });
-    data = await res.json();
-  } else {
-    resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> キーワードマッチ分析中...</div>';
-    const res = await fetch('/api/analyze/free', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ transcript, industry })
-    });
-    data = await res.json();
+  try {
+    if (mode === 'ai') {
+      keyPanel.style.display = 'block';
+      const api_key = document.getElementById('api-key').value.trim();
+      if (!api_key) { showToast('AI分析にはAPI Keyが必要です', 'error'); return; }
+      resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> Claude AIが分析中...</div>';
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ transcript, api_key, industry })
+      });
+      data = await res.json();
+    } else {
+      resultEl.innerHTML = '<div class="loading"><div class="spinner"></div> キーワードマッチ分析中...</div>';
+      const res = await fetch('/api/analyze/free', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ transcript, industry })
+      });
+      data = await res.json();
+    }
+  } catch(e) {
+    resultEl.innerHTML = `<div class="card" style="border-color:#fca5a5;background:#fff5f5;"><strong style="color:var(--danger);">通信エラー：</strong>${e.message}</div>`;
+    return;
   }
 
   if (data.error) {
@@ -1011,7 +1016,21 @@ async function runAnalysis(mode) {
   </div>`;
 
   if (!ranked.length) {
-    html += '<div class="card"><div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-text">一致するコンタクトが見つかりませんでした。コンタクトの業種・役職・メモを充実させると精度が上がります。</div></div></div>';
+    html += `<div class="card" style="border-color:#e5e7eb;">
+      <div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <div class="empty-state-text" style="font-weight:700;margin-bottom:8px;">該当するコンタクトが見つかりませんでした</div>
+        <div style="font-size:13px;color:var(--gray-500);text-align:left;max-width:400px;">
+          <p style="margin-bottom:6px;">精度を上げるには、コンタクトに以下を登録してください：</p>
+          <ul style="padding-left:18px;line-height:1.8;">
+            <li>業種（例：IT・ソフトウェア、人材 など）</li>
+            <li>役職（例：営業部長、代表取締役 など）</li>
+            <li>タグ・カテゴリー</li>
+            <li>メモ欄（課題・ニーズ・関心事）</li>
+          </ul>
+        </div>
+      </div>
+    </div>`;
   } else {
     html += `<div style="font-size:14px;font-weight:700;margin-bottom:12px;">🏆 親和性ランキング（${ranked.length}件）</div>`;
     ranked.forEach(r => {
