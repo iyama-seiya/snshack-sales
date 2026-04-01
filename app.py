@@ -621,6 +621,4 @@ if __name__ == "__main__":
     print("ブラウザで http://localhost:5000 を開いてください")
     print("終了するには Ctrl+C を押してください")
     print("=" * 50)
-    BASE = os.path.dirname(__file__)
-    extra = [os.path.join(BASE, "index.html"), os.path.join(BASE, "reports_bp.py")]
-    app.run(debug=False, port=5000, use_reloader=True, extra_files=extra)
+    app.run(debug=False, port=5000)

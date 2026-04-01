@@ -956,7 +956,10 @@ async function runAnalysis(mode) {
   const safeJson = async (res) => {
     const text = await res.text();
     try { return JSON.parse(text); }
-    catch { throw new Error('サーバーから予期しない応答がありました。ツールを再起動してください。'); }
+    catch {
+      const plain = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+      throw new Error(plain || `HTTP ${res.status} エラー — ツールを再起動してください`);
+    }
   };
 
   try {
